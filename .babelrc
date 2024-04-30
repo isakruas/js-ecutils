@@ -1,0 +1,13 @@
+{
+  "presets": [
+    [
+      "@babel/preset-env",
+      {
+        "targets": { "esmodules": false },
+        "modules": "commonjs",
+        "exclude": ["@babel/plugin-transform-exponentiation-operator"]
+      }
+    ]
+  ],
+  "plugins": []
+}

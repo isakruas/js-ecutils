@@ -1,17 +1,17 @@
-class Point {
+export class Point {
   /**
    * Represents a point on an elliptic curve.
    * @param {BigInt} x - The x-coordinate of the point.
    * @param {BigInt} y - The y-coordinate of the point.
    */
   constructor(x, y) {
-    this.x = x;
-    this.y = y;
-    Object.freeze(this); // Freezing the object to make it immutable
+    this.x = x
+    this.y = y
+    Object.freeze(this) // Freezing the object to make it immutable
   }
 }
 
-class EllipticCurveOperations {
+export class EllipticCurveOperations {
   constructor() {}
 
   /**
@@ -22,21 +22,30 @@ class EllipticCurveOperations {
    */
   add_points(P, Q) {
     if (P.x == undefined || P.y == undefined) {
-      return Q;
+      return Q
     }
 
     if (Q.x == undefined || Q.y == undefined) {
-      return P;
+      return P
+    }
+
+    if (!this.is_point_on_curve(P) || !this.is_point_on_curve(Q)) {
+      throw new Error(
+        'Invalid input: One or both of the input points are not on the elliptic curve.',
+      )
     }
 
     if (P === Q) {
-      return this.double_point(P);
+      return this.double_point(P)
     }
 
-    const lambda = (Q.y - P.y) * this.mod_inverse(Q.x - P.x);
-    const x3 = lambda ** 2n - P.x - Q.x;
-    const y3 = lambda * (P.x - x3) - P.y;
-    return new Point(this.modulus(x3, this.p), this.modulus(y3, this.p));
+    const lambda = (Q.y - P.y) * this.mod_inverse(Q.x - P.x)
+    if (!lambda) {
+      return new Point()
+    }
+    const x3 = lambda ** 2n - P.x - Q.x
+    const y3 = lambda * (P.x - x3) - P.y
+    return new Point(this.modulus(x3, this.p), this.modulus(y3, this.p))
   }
 
   /**
@@ -46,15 +55,22 @@ class EllipticCurveOperations {
    */
   double_point(P) {
     if (P.x == undefined || P.y == undefined) {
-      return P;
+      return P
     }
-    const lambda = (3n * P.x ** 2n + this.a) * this.mod_inverse(2n * P.y);
+
+    if (!this.is_point_on_curve(P)) {
+      throw new Error(
+        'Invalid input: One or both of the input points are not on the elliptic curve.',
+      )
+    }
+
+    const lambda = (3n * P.x ** 2n + this.a) * this.mod_inverse(2n * P.y)
     if (!lambda) {
-      return new Point();
+      return new Point()
     }
-    const x3 = lambda ** 2n - 2n * P.x;
-    const y3 = lambda * (P.x - x3) - P.y;
-    return new Point(this.modulus(x3, this.p), this.modulus(y3, this.p));
+    const x3 = lambda ** 2n - 2n * P.x
+    const y3 = lambda * (P.x - x3) - P.y
+    return new Point(this.modulus(x3, this.p), this.modulus(y3, this.p))
   }
 
   /**
@@ -64,31 +80,47 @@ class EllipticCurveOperations {
    * @returns {Point} The resulting point.
    */
   multiply_point(k, P) {
-    if (typeof k !== "bigint" || k <= 0n || k >= this.n) {
-      throw new Error("k is not in the range 0 < k < n");
+    if (typeof k !== 'bigint' || k <= 0n || k >= this.n) {
+      throw new Error('k is not in the range 0 < k < n')
     }
 
-    let num_bits = k.toString(2).length;
-    let r = new Point(0n, 0n);
-    let Q = new Point(P.x, P.y);
-    let l = 0;
+    let num_bits = k.toString(2).length
+    let r = new Point(0n, 0n)
+    let Q = new Point(P.x, P.y)
+    let l = 0
     for (let i = num_bits - 1; i >= 0; i--) {
       if (r.x === 0n && r.y === 0n) {
-        r = Q;
+        r = Q
         if (l == 0) {
-          continue;
+          continue
         }
       }
-      r = this.double_point(r);
+      r = this.double_point(r)
       if ((k >> BigInt(i)) & BigInt(1)) {
         if (r.x === 0n && r.y === 0n) {
-          r = P;
+          r = P
         } else {
-          r = this.add_points(r, Q);
+          r = this.add_points(r, Q)
         }
       }
     }
-    return r;
+    return r
+  }
+
+  /**
+   * Checks if a point lies on the elliptic curve.
+   * @param {Point} p - The point to check.
+   * @returns {boolean} True if the point is on the curve, False otherwise.
+   */
+  is_point_on_curve(p) {
+    if (p.x === undefined || p.y === undefined) {
+      return false
+    }
+
+    // The equation of the curve is y^2 = x^3 + ax + b. We check if the point satisfies this equation.
+    const left_side = this.modulus(p.y ** 2n, this.p)
+    const right_side = this.modulus(p.x ** 3n + this.a * p.x + this.b, this.p)
+    return left_side === right_side
   }
 
   /**
@@ -97,7 +129,7 @@ class EllipticCurveOperations {
    * @returns {BigInt} The modular multiplicative inverse.
    */
   mod_inverse(a) {
-    return this.extended_gcd(a, this.p)[1];
+    return this.extended_gcd(a, this.p)[1]
   }
 
   /**
@@ -108,10 +140,10 @@ class EllipticCurveOperations {
    */
   extended_gcd(a, b) {
     if (b === 0n) {
-      return [a, 1n, 0n];
+      return [a, 1n, 0n]
     }
-    const [g, x, y] = this.extended_gcd(b, this.modulus(a, b));
-    return [g, y, x - (a / b) * y];
+    const [g, x, y] = this.extended_gcd(b, this.modulus(a, b))
+    return [g, y, x - (a / b) * y]
   }
 
   /**
@@ -121,11 +153,11 @@ class EllipticCurveOperations {
    * @returns {BigInt} The positive result of the modulo operation.
    */
   modulus(a, b) {
-    return ((a % b) + b) % b;
+    return ((a % b) + b) % b
   }
 }
 
-class EllipticCurve extends EllipticCurveOperations {
+export class EllipticCurve extends EllipticCurveOperations {
   /**
    * Represents an elliptic curve.
    * @param {BigInt} p - The prime modulus of the field.
@@ -136,13 +168,13 @@ class EllipticCurve extends EllipticCurveOperations {
    * @param {BigInt} h - The cofactor of the curve.
    */
   constructor(p, a, b, G, n, h) {
-    super(); 
-    this.p = p;
-    this.a = a;
-    this.b = b;
-    this.G = G;
-    this.n = n;
-    this.h = h;
-    Object.freeze(this); // Freezing the object to make it immutable
+    super()
+    this.p = p
+    this.a = a
+    this.b = b
+    this.G = G
+    this.n = n
+    this.h = h
+    Object.freeze(this) // Freezing the object to make it immutable
   }
 }
