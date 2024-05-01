@@ -39,6 +39,16 @@ test('koblitz: encode and decode ascii', () => {
   expect(decoded_message).toBe(message)
 })
 
+test('koblitz: should serialize and deserialize points and auxiliary values', () => {
+  const message = 'Hello, EC!'
+  const encoded = encoder.encode(message, 2n ** 8n)
+  const serialized = encoder.serialize([encoded])
+  const deserialized = encoder.deserialize(serialized)
+  expect(deserialized[0][0].x).toEqual(encoded[0].x)
+  expect(deserialized[0][0].y).toEqual(encoded[0].y)
+  expect(deserialized[0][1]).toEqual(encoded[1])
+})
+
 test('koblitz: encode and decode lengthy ascii', () => {
   const message = `Morbi nibh dolor, tempus vel arcu eget, sagittis scelerisque mi. Curabitur aliquet tempus odio, vitae rutrum tortor mollis sit amet. Aliquam finibus sapien eu urna efficitur cursus. Nullam ultricies justo et magna molestie, non tincidunt lacus fringilla. Nulla facilisi. Nullam commodo aliquam placerat. Vivamus imperdiet diam id tincidunt ultrices. Nulla vitae odio massa. Nullam rhoncus scelerisque quam vel scelerisque. Duis ac diam quam. Ut volutpat, tellus a vehicula aliquet, ipsum velit maximus ligula, vel fringilla urna libero vel orci. Nulla iaculis tristique sapien in faucibus. Nullam euismod hendrerit sapien, id pulvinar ipsum dictum non.
   Suspendisse aliquet leo non vulputate lacinia. Mauris sed malesuada sem, sit amet cursus erat. Donec ac cursus dui. Sed at facilisis arcu. Phasellus at pulvinar lorem, tristique fermentum mauris. Donec commodo consequat eros, ut facilisis risus. Donec eget nunc accumsan, scelerisque lectus non, lobortis urna. Mauris non volutpat enim. Curabitur dignissim lorem lacus, elementum luctus odio bibendum at. Praesent rhoncus magna metus, ut vehicula est sodales a. Donec euismod tristique nisl quis sagittis.

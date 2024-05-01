@@ -5,7 +5,7 @@
     "format": "prettier --write \"src/**/*.js\"",
     "lint": "npx eslint src/**/*.js",
     "test": "jest dist",
-    "start": "serve",
+    "start": "serve app/frontend/",
     "coverage": "jest dist --coverage",
     "tree": "tree --prune -I 'node_modules'",
     "pack": "npx webpack --mode=production --config webpack.config.js && find dist -type f ! -name 'bundle.js' -exec rm -f {} + && rm -rf .babel_cache && rm -rf .jest_cache",

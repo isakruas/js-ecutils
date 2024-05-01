@@ -231,4 +231,32 @@ export class Koblitz {
     }
     return characters.join('')
   }
+
+  /**
+   * Serializes an array of points and their corresponding auxiliary values 'j' into a JSON-friendly representation.
+   *
+   * @param {Array<Array<Point, number>>} points - An array of tuples, where each tuple contains a Point object representing a point on the elliptic curve and the auxiliary value 'j' used in its encoding.
+   * @returns {Array<Object>} A new array containing objects with properties `x`, `y`, and `j`. Each object represents the serialized data for a point and its 'j' value.
+   */
+  serialize(points) {
+    return points.map((point) => {
+      return {
+        x: point[0].x.toString(),
+        y: point[0].y.toString(),
+        j: point[1].toString(),
+      }
+    })
+  }
+
+  /**
+   * Deserializes an array of objects back into an array of tuples containing Point objects and their corresponding auxiliary values 'j'.
+   *
+   * @param {Array<Object>} serializedPoints - An array of objects with properties `x`, `y`, and `j`. Each object represents the serialized data for a point and its 'j' value.
+   * @returns {Array<Array<Point, number>>} A new array containing tuples, where each tuple contains a Point object and the auxiliary value 'j' deserialized from the input objects.
+   */
+  deserialize(serializedPoints) {
+    return serializedPoints.map((item) => {
+      return [new Point(BigInt(item.x), BigInt(item.y)), BigInt(item.j)]
+    })
+  }
 }
