@@ -1,0 +1,31 @@
+# Ignore the following common files and directories:
+
+# Node.js modules
+node_modules/
+
+# Ignore development files and directories
+dist/                # Exclude the build output directory (if not needed)
+src/                 # Exclude the source files (if only publishing dist)
+
+# Ignore common configuration files
+.eslintignore        # ESLint ignore file
+.eslintrc            # ESLint config file
+.babelrc             # Babel config file
+.npmrc              # npm config file
+.vscode/            # VS Code settings folder
+.git/               # Git version control directory
+
+# Ignore testing files and directories
+tests/              # Exclude any test directories
+test/               # Exclude any test directories
+**/*.test.js        # Ignore all test files with .test.js extension
+
+# Ignore other common files
+*.log               # Ignore log files
+*.tmp               # Ignore temporary files
+*.lock              # Ignore lock files (except package-lock.json if you want to keep it)
+webpack.config.js   # Ignore Webpack config (if not needed)
+README.md           # You might want to include this for documentation
+
+# Ignore specific folders and files as needed
+app/                 # Exclude the app directory

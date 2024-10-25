@@ -1,4 +1,30 @@
 {
+  "name": "ecutils",
+  "version": "0.0.1-alpha.1",
+  "description": "JavaScript library for Elliptic Curve Cryptography: key exchanges (Diffie-Hellman, Massey-Omura), ECDSA signatures, and Koblitz encoding. Suitable for crypto education and secure systems.",
+  "keywords": [
+    "ecdsa",
+    "secure-communication",
+    "public-key-cryptography",
+    "cryptographic-algorithms",
+    "digital-signatures",
+    "python-cryptography",
+    "elliptic-curve-cryptography",
+    "diffie-hellman-key-exchange",
+    "ecc-based-protocols",
+    "message-encoding-and-decoding",
+    "koblitz-encoding",
+    "massey-omura-protocol",
+    "elliptic-curve-operation"
+  ],
+  "author": "Isak Ruas",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "clean": "rm -rf dist/* && rm -rf .babel_cache && rm -rf .jest_cache",
     "build": "npm run clean && babel src -d dist;",
