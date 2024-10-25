@@ -1,8 +1,8 @@
-# ecutils
+# js-ecutils
 
 **JavaScript Library for Elliptic Curve Cryptography**
 
-`ecutils` is a JavaScript library designed for implementing Elliptic Curve Cryptography (ECC) algorithms, including key exchanges (Diffie-Hellman, Massey-Omura), ECDSA signatures, and Koblitz encoding. This library is suitable for educational purposes in cryptography and for use in secure systems.
+`js-ecutils` is a JavaScript library designed for implementing Elliptic Curve Cryptography (ECC) algorithms, including key exchanges (Diffie-Hellman, Massey-Omura), ECDSA signatures, and Koblitz encoding. This library is suitable for educational purposes in cryptography and for use in secure systems.
 
 ## Features
 
@@ -22,10 +22,10 @@
 
 ## Installation
 
-To install `ecutils`, you can use npm:
+To install `js-ecutils`, you can use npm:
 
 ```bash
-npm install ecutils
+npm install js-ecutils
 ```
 
 ## Usage
@@ -33,7 +33,7 @@ npm install ecutils
 After installing, you can import the library into your JavaScript project:
 
 ```javascript
-const { core: { Point, EllipticCurve } } = require('ecutils');
+const { core: { Point, EllipticCurve } } = require('js-ecutils');
 
 // Example parameters
 let p = 23n;  // The prime number defining the finite field's order
@@ -247,7 +247,7 @@ Here are some examples of using the key exchange protocols and other features of
 ### Encoding and Decoding Messages with Koblitz
 
 ```js
-const { algorithms: { Koblitz } } = require('ecutils');
+const { algorithms: { Koblitz } } = require('js-ecutils');
 
 // Initialize Koblitz with a specific curve
 const koblitz = new Koblitz('secp521r1');
@@ -264,7 +264,7 @@ console.log(decoded_message);
 ### Digital Signatures with ECDSA
 
 ```js
-const { algorithms: { DigitalSignature } } = require('ecutils');
+const { algorithms: { DigitalSignature } } = require('js-ecutils');
 
 // Create a DigitalSignature instance with your private key
 const privateKey = BigInt(123456);
@@ -285,7 +285,7 @@ console.log(`Is the signature valid? ${isValid}`);
 ### Diffie-Hellman Key Exchange
 
 ```js
-const { protocols: { DiffieHellman } } = require('ecutils');
+const { protocols: { DiffieHellman } } = require('js-ecutils');
 
 // Alice's side
 const alice = new DiffieHellman(12345n);
@@ -308,7 +308,7 @@ console.log(`Are the shared secrets equal? ${isSharedSecretEqual}`);
 ### Massey-Omura Key Exchange
 
 ```js
-const { algorithms: { Koblitz }, protocols: { MasseyOmura } } = require('ecutils');
+const { algorithms: { Koblitz }, protocols: { MasseyOmura } } = require('js-ecutils');
 
 // Initialize the Koblitz instance for the elliptic curve 'secp192k1'
 const koblitz = new Koblitz('secp192k1');
