@@ -9,7 +9,7 @@
     "public-key-cryptography",
     "cryptographic-algorithms",
     "digital-signatures",
-    "python-cryptography",
+    "javascript-cryptography",
     "elliptic-curve-cryptography",
     "diffie-hellman-key-exchange",
     "ecc-based-protocols",
