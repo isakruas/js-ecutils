@@ -45,11 +45,15 @@ jobs:
 
       # Build the package
       - name: Build package
-        run: npm run build
+        run: npm run make
 
       # Run tests
       - name: Run tests
         run: npm test
+
+      # Run coverage
+      - name: Run coverage
+        run: npm run coverage
 
       # Create Git tag
       - name: Create Git tag

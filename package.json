@@ -1,6 +1,6 @@
 {
   "name": "js-ecutils",
-  "version": "0.0.1-alpha.1",
+  "version": "0.0.1-alpha",
   "description": "JavaScript library for Elliptic Curve Cryptography: key exchanges (Diffie-Hellman, Massey-Omura), ECDSA signatures, and Koblitz encoding. Suitable for crypto education and secure systems.",
   "repository":"https://github.com/isakruas/js-ecutils",
   "keywords": [
@@ -20,7 +20,7 @@
   ],
   "author": "Isak Ruas",
   "license": "MIT",
-  "main": "dist/index.js",
+  "main": "dist/npm/index.js",
   "files": [
     "dist/",
     "LICENSE",
@@ -28,15 +28,15 @@
   ],
   "scripts": {
     "clean": "rm -rf dist/* && rm -rf .babel_cache && rm -rf .jest_cache",
-    "build": "npm run clean && babel src -d dist;",
+    "build:npm": "babel src -d dist/npm/",
+    "build:web": "webpack --mode=production --config webpack.config.js && rm -rf .babel_cache && rm -rf .jest_cache",
     "format": "prettier --write \"src/**/*.js\"",
     "lint": "npx eslint src/**/*.js",
-    "test": "jest dist",
+    "test": "jest dist/npm",
     "start": "serve app/frontend/",
-    "coverage": "jest dist --coverage",
+    "coverage": "jest dist/npm --coverage",
     "tree": "tree --prune -I 'node_modules'",
-    "pack": "npx webpack --mode=production --config webpack.config.js && find dist -type f ! -name 'bundle.js' -exec rm -f {} + && rm -rf .babel_cache && rm -rf .jest_cache",
-    "make": "npm run format && npm run lint && npm run build && npm run test && npm run coverage && npm run pack && npm run start"
+    "make": "npm run format && npm run lint && npm run clean && npm run build:npm && npm run build:web"
   },
   "devDependencies": {
     "@babel/cli": "^7.24.1",

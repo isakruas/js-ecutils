@@ -22,36 +22,96 @@
 
 ## Installation
 
-To install `js-ecutils`, you can use npm:
+To install `js-ecutils`, you can use npm or include the script directly in your web application:
+
+**Using npm:**
 
 ```bash
 npm install js-ecutils
 ```
 
+**Or, for web usage:**  
+Include the following script in your HTML:
+
+```html
+<script src="https://unpkg.com/js-ecutils@latest/dist/web/min.js"></script>
+```
+
 ## Usage
 
-After installing, you can import the library into your JavaScript project:
+After installing the `js-ecutils` library, you can import it into your JavaScript project or use it directly in a browser. Below are the steps for using the library in both environments.
+
+### Using in Node.js
+
+To use the library in a Node.js project, import the required modules as shown below:
 
 ```javascript
+// Importing necessary classes
 const { core: { Point, EllipticCurve } } = require('js-ecutils');
 
-// Example parameters
-let p = 23n;  // The prime number defining the finite field's order
-let a = 1n;   // The 'a' coefficient in the curve equation
-let b = 1n;   // The 'b' coefficient in the curve equation
-let G = new Point(0n, 1n);
-let n = 28n;
-let h = 1n;
+// Defining parameters for the elliptic curve
+const p = 23n;  // The prime number defining the finite field's order
+const a = 1n;   // The 'a' coefficient in the curve equation
+const b = 1n;   // The 'b' coefficient in the curve equation
+const G = new Point(0n, 1n);  // Generator point
+const n = 28n;  // Order of the point
+const h = 1n;   // Cofactor
 
+// Creating an instance of the elliptic curve
 const curve = new EllipticCurve(p=p, a=a, b=b, G=G, n=n, h=h);
 
-// Define points on the curve
+// Defining points on the curve
 const point1 = new Point(6n, 19n);
 const point2 = new Point(3n, 13n);
 
-// Add the points
+// Adding the points
 const sum_point = curve.add_points(point1, point2);
 console.log(`The sum of the points is (${sum_point.x}, ${sum_point.y}).`);
+```
+
+### Using in Browsers
+
+To use the library in a browser, include the JavaScript file in your HTML and utilize the classes available in the global `ecutils` object. Add the script as shown below:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elliptic Curve Cryptography Example</title>
+    <script src="https://unpkg.com/js-ecutils@latest/dist/web/min.js"></script>
+    <script>
+        window.onload = function() {
+            // Importing necessary classes from the global object
+            const Point = window.ecutils.core.Point;
+            const EllipticCurve = window.ecutils.core.EllipticCurve;
+
+            // Defining parameters for the elliptic curve
+            const p = 23n;
+            const a = 1n;
+            const b = 1n;
+            const G = new Point(0n, 1n);
+            const n = 28n;
+            const h = 1n;
+
+            // Creating an instance of the elliptic curve
+            const curve = new EllipticCurve(p, a, b, G, n, h);
+
+            // Defining points on the curve
+            const point1 = new Point(6n, 19n);
+            const point2 = new Point(3n, 13n);
+
+            // Adding the points
+            const sum_point = curve.add_points(point1, point2);
+            console.log(`The sum of the points is (${sum_point.x}, ${sum_point.y}).`);
+        };
+    </script>
+</head>
+<body>
+    <h1>Example using js-ecutils Library</h1>
+</body>
+</html>
 ```
 
 ## API Documentation
@@ -242,11 +302,12 @@ console.log(`The sum of the points is (${sum_point.x}, ${sum_point.y}).`);
 
 ## Examples
 
-Here are some examples of using the key exchange protocols and other features of `ecutils`.
+Here are some examples of using the key exchange protocols and other features of `js-ecutils`.
 
 ### Encoding and Decoding Messages with Koblitz
 
 ```js
+// Importing necessary classes
 const { algorithms: { Koblitz } } = require('js-ecutils');
 
 // Initialize Koblitz with a specific curve
@@ -264,6 +325,7 @@ console.log(decoded_message);
 ### Digital Signatures with ECDSA
 
 ```js
+// Importing necessary classes
 const { algorithms: { DigitalSignature } } = require('js-ecutils');
 
 // Create a DigitalSignature instance with your private key
@@ -285,6 +347,7 @@ console.log(`Is the signature valid? ${isValid}`);
 ### Diffie-Hellman Key Exchange
 
 ```js
+// Importing necessary classes
 const { protocols: { DiffieHellman } } = require('js-ecutils');
 
 // Alice's side
@@ -308,6 +371,7 @@ console.log(`Are the shared secrets equal? ${isSharedSecretEqual}`);
 ### Massey-Omura Key Exchange
 
 ```js
+// Importing necessary classes
 const { algorithms: { Koblitz }, protocols: { MasseyOmura } } = require('js-ecutils');
 
 // Initialize the Koblitz instance for the elliptic curve 'secp192k1'
@@ -361,7 +425,7 @@ console.log(decodedMessage);
 
 ## Contributing
 
-Contributions are welcome! If you’d like to contribute to `ecutils`, please follow these steps:
+Contributions are welcome! If you’d like to contribute to `js-ecutils`, please follow these steps:
 
 1. Fork the repository.
 2. Create a new branch for your feature or bug fix.
