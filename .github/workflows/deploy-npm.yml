@@ -9,133 +9,49 @@ permissions:
   contents: write
 
 jobs:
-  checkout:
+  publish-npm:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.HUB_TOKEN }}
 
-      - name: Upload repository files
-        uses: actions/upload-artifact@v3
-        with:
-          name: repo-files
-          path: .
-
-  setup-node:
-    runs-on: ubuntu-latest
-    needs: checkout
-
-    steps:
-      - name: Download repository files
-        uses: actions/download-artifact@v3
-        with:
-          name: repo-files
-
+      # Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
           registry-url: 'https://registry.npmjs.org/'
 
-  install:
-    runs-on: ubuntu-latest
-    needs: setup-node
-
-    steps:
-      - name: Download repository files
-        uses: actions/download-artifact@v3
-        with:
-          name: repo-files
-
+      # Install dependencies
       - name: Install dependencies
         run: npm install
 
-  get-hash:
-    runs-on: ubuntu-latest
-    needs: install
-
-    steps:
-      - name: Download repository files
-        uses: actions/download-artifact@v3
-        with:
-          name: repo-files
-
+      # Get the short hash of the last commit
       - name: Get short commit hash
+        id: get_hash
         run: echo "HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-  update-version:
-    runs-on: ubuntu-latest
-    needs: get-hash
-
-    steps:
-      - name: Download repository files
-        uses: actions/download-artifact@v3
-        with:
-          name: repo-files
-
+      # Update the version in package.json
       - name: Update version
+        id: update_version
         run: |
-          VERSION="0.0.1-alpha.${{ env.HASH }}"
+          VERSION="0.0.1-alpha.$HASH"
           jq --arg ver "$VERSION" '.version = $ver' package.json > tmp.json && mv tmp.json package.json
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-      - name: Upload updated package.json
-        uses: actions/upload-artifact@v3
-        with:
-          name: updated-files
-          path: package.json
 
-  build:
-    runs-on: ubuntu-latest
-    needs: update-version
-
-    steps:
-      - name: Download updated files
-        uses: actions/download-artifact@v3
-        with:
-          name: updated-files
-
+      # Build the package
       - name: Build package
-        run: npm run make
+        run: npm run build
 
-  test:
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Download updated files
-        uses: actions/download-artifact@v3
-        with:
-          name: updated-files
-
+      # Run tests
       - name: Run tests
         run: npm test
 
-  coverage:
-    runs-on: ubuntu-latest
-    needs: test
-
-    steps:
-      - name: Download updated files
-        uses: actions/download-artifact@v3
-        with:
-          name: updated-files
-
-      - name: Run coverage
-        run: npm run coverage
-
-  tag:
-    runs-on: ubuntu-latest
-    needs: coverage
-
-    steps:
-      - name: Download updated files
-        uses: actions/download-artifact@v3
-        with:
-          name: updated-files
-
+      # Create Git tag
       - name: Create Git tag
         run: |
           git config --local user.name "github-actions[bot]"
@@ -143,16 +59,7 @@ jobs:
           git tag ${{ env.VERSION }}
           git push origin ${{ env.VERSION }}
 
-  release:
-    runs-on: ubuntu-latest
-    needs: tag
-
-    steps:
-      - name: Download updated files
-        uses: actions/download-artifact@v3
-        with:
-          name: updated-files
-
+      # Create GitHub Release
       - name: Create GitHub Release
         uses: actions/create-release@v1
         env:
@@ -163,16 +70,7 @@ jobs:
           draft: false
           prerelease: true
 
-  publish:
-    runs-on: ubuntu-latest
-    needs: release
-
-    steps:
-      - name: Download updated files
-        uses: actions/download-artifact@v3
-        with:
-          name: updated-files
-
+      # Publish to npm
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
