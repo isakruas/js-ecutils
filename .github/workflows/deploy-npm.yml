@@ -45,7 +45,7 @@ jobs:
 
       # Build the package
       - name: Build package
-        run: npm run build
+        run: npm run make
 
       # Run tests
       - name: Run tests
