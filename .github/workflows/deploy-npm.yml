@@ -9,53 +9,83 @@ permissions:
   contents: write
 
 jobs:
-  publish-npm:
+  checkout:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           token: ${{ secrets.HUB_TOKEN }}
 
-      # Set up Node.js environment
+  setup-node:
+    runs-on: ubuntu-latest
+    needs: checkout
+
+    steps:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
           registry-url: 'https://registry.npmjs.org/'
 
-      # Install dependencies
+  install:
+    runs-on: ubuntu-latest
+    needs: setup-node
+
+    steps:
       - name: Install dependencies
         run: npm install
 
-      # Get the short hash of the last commit
+  get-hash:
+    runs-on: ubuntu-latest
+    needs: install
+
+    steps:
       - name: Get short commit hash
         id: get_hash
         run: echo "HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      # Update the version in package.json
+  update-version:
+    runs-on: ubuntu-latest
+    needs: get-hash
+
+    steps:
       - name: Update version
-        id: update_version
         run: |
-          VERSION="0.0.1-alpha.$HASH"
+          VERSION="0.0.1-alpha.${{ env.HASH }}"
           jq --arg ver "$VERSION" '.version = $ver' package.json > tmp.json && mv tmp.json package.json
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      # Build the package
+  build:
+    runs-on: ubuntu-latest
+    needs: update-version
+
+    steps:
       - name: Build package
         run: npm run make
 
-      # Run tests
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
       - name: Run tests
         run: npm test
 
-      # Run coverage
+  coverage:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
       - name: Run coverage
         run: npm run coverage
 
-      # Create Git tag
+  tag:
+    runs-on: ubuntu-latest
+    needs: coverage
+
+    steps:
       - name: Create Git tag
         run: |
           git config --local user.name "github-actions[bot]"
@@ -63,7 +93,11 @@ jobs:
           git tag ${{ env.VERSION }}
           git push origin ${{ env.VERSION }}
 
-      # Create GitHub Release
+  release:
+    runs-on: ubuntu-latest
+    needs: tag
+
+    steps:
       - name: Create GitHub Release
         uses: actions/create-release@v1
         env:
@@ -74,7 +108,11 @@ jobs:
           draft: false
           prerelease: true
 
-      # Publish to npm
+  publish:
+    runs-on: ubuntu-latest
+    needs: release
+
+    steps:
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
