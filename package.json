@@ -24,7 +24,11 @@
   "files": [
     "dist/",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "clean": "rm -rf dist/* && rm -rf .babel_cache && rm -rf .jest_cache",

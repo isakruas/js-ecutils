@@ -2,6 +2,12 @@
 
 **JavaScript Library for Elliptic Curve Cryptography**
 
+[![Latest Version](https://img.shields.io/npm/v/js-ecutils.svg?style=flat)](https://www.npmjs.com/package/js-ecutils)
+[![Downloads](https://img.shields.io/npm/dt/js-ecutils.svg)](https://www.npmjs.com/package/js-ecutils)
+[![Downloads](https://img.shields.io/npm/dm/js-ecutils.svg)](https://www.npmjs.com/package/js-ecutils)
+[![Downloads](https://img.shields.io/npm/dw/js-ecutils.svg)](https://www.npmjs.com/package/js-ecutils)
+[![codecov](https://codecov.io/gh/isakruas/js-ecutils/branch/master/graph/badge.svg)](https://codecov.io/gh/isakruas/js-ecutils)
+
 `js-ecutils` is a JavaScript library designed for implementing Elliptic Curve Cryptography (ECC) algorithms, including key exchanges (Diffie-Hellman, Massey-Omura), ECDSA signatures, and Koblitz encoding. This library is suitable for educational purposes in cryptography and for use in secure systems.
 
 ## Features
@@ -19,6 +25,7 @@
 - [Examples](#examples)
 - [Contributing](#contributing)
 - [License](#license)
+- [Language-Specific Libraries for Elliptic Curve Cryptography](#language-specific-libraries-for-elliptic-curve-cryptography)
 
 ## Installation
 
@@ -435,3 +442,13 @@ Contributions are welcome! If you’d like to contribute to `js-ecutils`, please
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details. 
+
+## Language-Specific Libraries for Elliptic Curve Cryptography
+
+In addition to the JavaScript module, there are other language-specific libraries available for elliptic curve cryptography:
+
+- **Python Library for Elliptic Curve Cryptography**: The `ecutils` package provides elliptic curve functionalities tailored for Python developers. You can find it on [GitHub](https://github.com/isakruas/ecutils).
+
+- **Go Library for Elliptic Curve Cryptography**: The `go-ecutils` library offers similar elliptic curve utilities for Go developers. More information and documentation can be found on [GitHub](https://github.com/isakruas/go-ecutils).
+
+These libraries enable developers to utilize elliptic curve cryptography in their preferred programming environments, ensuring flexibility and ease of integration.

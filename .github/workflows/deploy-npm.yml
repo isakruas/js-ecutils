@@ -45,11 +45,17 @@ jobs:
 
       # Build the package
       - name: Build package
-        run: npm run build
+        run: npm run make
 
       # Run tests
       - name: Run tests
-        run: npm test
+        run: npx jest --coverage
+
+      # Upload results to Codecov
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       # Create Git tag
       - name: Create Git tag
