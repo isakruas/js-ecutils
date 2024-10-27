@@ -1,5 +1,7 @@
 import { test, expect } from '@jest/globals'
 import { DiffieHellman, MasseyOmura } from './protocols'
+import { Koblitz } from './algorithms'
+import { Point } from './core'
 
 test('diffie-hellman: compute shared secret', () => {
   const private_key_alice = 12345n
@@ -18,31 +20,66 @@ test('diffie-hellman: compute shared secret', () => {
 })
 
 test('massey-omura: encryption decryption', () => {
-  const private_key_sender = 123456n
-  const mo_sender = new MasseyOmura(private_key_sender)
+  // Initialize the Koblitz instance for the elliptic curve 'secp192k1'
+  const koblitz = new Koblitz('secp192k1')
 
-  const private_key_receiver = 654321n
-  const mo_receiver = new MasseyOmura(private_key_receiver)
+  // Sender's side
+  // -------------
+  const privateKeySender = BigInt('70604135')
+  // Initialize Massey-Omura protocol with the sender's private key
+  const moSender = new MasseyOmura(privateKeySender)
 
-  const message = mo_sender.curve.G // Using the curve's generator point for simplicity
+  // Encode the message using the Koblitz method
+  // `j` is used to handle the ambiguity in the decoding process
+  const [message, j] = koblitz.encode('Hello, world!')
 
-  // Sender encrypts the message
-  const encrypted_by_sender = mo_sender.first_encryption_step(message)
+  // Perform the first encryption step with Massey-Omura protocol
+  const encryptedMsgSender = moSender.first_encryption_step(message)
 
-  // Receiver encrypts the already encrypted message
-  const encrypted_by_receiver =
-    mo_receiver.second_encryption_step(encrypted_by_sender)
+  // The encoded message is now sent to the receiver...
+  // (transmission of encryptedMsgSender)
 
-  // Sender decrypts the message partly
-  const partially_decrypted_by_sender = mo_sender.partial_decryption_step(
-    encrypted_by_receiver,
-  )
+  // Receiver's side
+  // ---------------
+  const privateKeyReceiver = BigInt('48239108668')
+  // Initialize Massey-Omura protocol with the receiver's private key
+  const moReceiver = new MasseyOmura(privateKeyReceiver)
 
-  // Receiver completes decryption
-  const fully_decrypted_message = mo_receiver.partial_decryption_step(
-    partially_decrypted_by_sender,
-  )
+  // Perform the second encryption step with Massey-Omura protocol
+  const encryptedMsgReceiver =
+    moReceiver.second_encryption_step(encryptedMsgSender)
+
+  // The double-encrypted message is sent back to the sender...
+  // (transmission of encryptedMsgReceiver)
+
+  // Sender's side again
+  // -------------------
+  const partialDecryptedMsg =
+    moSender.partial_decryption_step(encryptedMsgReceiver)
+
+  // The partially decrypted message is sent back to the receiver...
+  // (transmission of partialDecryptedMsg)
+
+  // Receiver's final decryption
+  // ---------------------------
+  const originalMessage =
+    moReceiver.partial_decryption_step(partialDecryptedMsg)
+
+  // Decode the message using the Koblitz method
+  // `j` is used to resolve the mapping from the elliptic curve point back to the message
+  const decodedMessage = koblitz.decode(originalMessage, j)
 
   // The fully decrypted message should match the original message
-  expect(fully_decrypted_message).toStrictEqual(message)
+  expect(decodedMessage).toStrictEqual('Hello, world!')
+})
+
+test('massey-omura: validate the public key value', () => {
+  const moSender = new MasseyOmura(654564n)
+
+  const P1 = new Point(
+    2561645154652864168258282342383115659685709191094067233983n,
+    89709827696035605786509950363037856155865475850237621433n,
+  )
+
+  expect(moSender.public_key.toString()).toStrictEqual(P1.toString())
 })

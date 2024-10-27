@@ -18,17 +18,53 @@ test('digital-signature: generate and verify signature', () => {
 
 test('digital-signature: verify signature with invalid inputs', () => {
   const message_hash = BigInt(545454445644654n)
+  const signature = ds.generate_signature(message_hash)
+
   // Choose invalid r and s values (outside the range [1, n-1])
   const invalid_r = ds.curve.n
   const invalid_s = BigInt(0)
+
   // Check that the appropriate exception is raised for invalid r and s
   expect(() => {
-    ds.verify_signature(ds.public_key, message_hash, invalid_r, invalid_s)
-  }).toThrowError()
+    ds.verify_signature(
+      ds.public_key,
+      message_hash,
+      invalid_r,
+      BigInt(signature[1]),
+    )
+  }).toThrowError('r or s are not in the valid range [1, curve order - 1].')
+
+  expect(() => {
+    ds.verify_signature(
+      ds.public_key,
+      message_hash,
+      BigInt(signature[0]),
+      invalid_s,
+    )
+  }).toThrowError('r or s are not in the valid range [1, curve order - 1].')
 })
 
 const encoder = new Koblitz('secp521r1')
 const decoder = new Koblitz('secp521r1')
+
+test('koblitz: encode throws error for unsupported alphabet size', () => {
+  const encoder = new Koblitz()
+  const message = 'Test message'
+
+  expect(() => {
+    encoder.encode(message, 250n)
+  }).toThrow('Alphabet size not supported')
+})
+
+test('koblitz: decode throws error for unsupported alphabet size', () => {
+  const decoder = new Koblitz()
+  const point = { x: 1n, y: 1n }
+  const j = 0n
+
+  expect(() => {
+    decoder.decode(point, j, 250n)
+  }).toThrow('Alphabet size not supported')
+})
 
 test('koblitz: encode and decode ascii', () => {
   const message = 'Hello, EC!'

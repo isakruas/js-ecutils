@@ -80,7 +80,7 @@ export class EllipticCurveOperations {
    * @returns {Point} The resulting point.
    */
   multiply_point(k, P) {
-    if (typeof k !== 'bigint' || k <= 0n || k >= this.n) {
+    if (typeof k !== 'bigint' || k < 1n || k >= this.n) {
       throw new Error('k is not in the range 0 < k < n')
     }
 

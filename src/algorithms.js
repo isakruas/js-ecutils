@@ -86,7 +86,7 @@ export class DigitalSignature {
    * @returns {boolean} True if the signature is valid, false otherwise.
    */
   verify_signature(public_key, message_hash, r, s) {
-    if (!(1 <= r < this.curve.n && 1 <= s < this.curve.n)) {
+    if (r < 1n || r >= this.curve.n || s < 1n || s >= this.curve.n) {
       throw new Error('r or s are not in the valid range [1, curve order - 1].')
     }
 
