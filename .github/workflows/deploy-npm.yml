@@ -39,7 +39,8 @@ jobs:
       - name: Update version
         id: update_version
         run: |
-          VERSION="0.0.1-alpha.$HASH"
+          BASE=$(jq -r .version package.json)
+          VERSION="${BASE}.${HASH}"
           jq --arg ver "$VERSION" '.version = $ver' package.json > tmp.json && mv tmp.json package.json
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
@@ -80,4 +81,4 @@ jobs:
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish
+        run: npm publish --access public
