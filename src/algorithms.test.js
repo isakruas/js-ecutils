@@ -1,123 +1,157 @@
-import { test, expect } from '@jest/globals'
-import { DigitalSignature, Koblitz } from './algorithms'
+import { test, expect, describe } from '@jest/globals'
+import { DigitalSignature } from './algorithms/digital_signature'
+import { Koblitz } from './algorithms/koblitz'
 
-let ds
+// ---------------------------------------------------------------------------
+// ECDSA — Elliptic Curve Digital Signature Algorithm
+//
+// Signing (private key d, generator G of order n):
+//   1. Choose random k ∈ [1, n-1]
+//   2. R = k·G,  r = R.x mod n
+//   3. s = (hash + r·d) · k⁻¹  mod n
+//
+// Verification (public key Q = d·G):
+//   1. w  = s⁻¹ mod n
+//   2. u₁ = hash·w mod n,  u₂ = r·w mod n
+//   3. R' = u₁·G + u₂·Q
+//   4. Accept iff R'.x mod n = r
+//
+// Security: the nonce k must never be reused across different messages
+// (cf. Sony PS3 ECDSA attack, 2010).
+// ---------------------------------------------------------------------------
 
-const private_key = BigInt(123456789)
-ds = new DigitalSignature(private_key)
+describe('ECDSA digital signatures', () => {
+  const privateKey = 123456789n
+  const ds = new DigitalSignature(privateKey)
 
-test('digital-signature: generate and verify signature', () => {
-  const message_hash = BigInt(545454445644654n)
-  const signature = ds.generate_signature(message_hash)
-  const r = signature[0]
-  const s = signature[1]
+  test('default curve is secp256k1', () => {
+    expect(ds.curveName).toBe('secp256k1')
+  })
 
-  const is_valid = ds.verify_signature(ds.public_key, message_hash, r, s)
-  expect(is_valid).toBe(true)
-})
+  test('sign and verify: valid signature is accepted', () => {
+    const messageHash = 545454445644654n
+    const [r, s] = ds.sign(messageHash)
+    expect(ds.verify(ds.publicKey, messageHash, r, s)).toBe(true)
+  })
 
-test('digital-signature: verify signature with invalid inputs', () => {
-  const message_hash = BigInt(545454445644654n)
-  const signature = ds.generate_signature(message_hash)
+  // r and s must be in [1, n-1]
+  test('verify rejects r or s outside [1, n-1]', () => {
+    const messageHash = 545454445644654n
+    const [r, s] = ds.sign(messageHash)
+    const n = ds._curve.n
 
-  // Choose invalid r and s values (outside the range [1, n-1])
-  const invalid_r = ds.curve.n
-  const invalid_s = BigInt(0)
-
-  // Check that the appropriate exception is raised for invalid r and s
-  expect(() => {
-    ds.verify_signature(
-      ds.public_key,
-      message_hash,
-      invalid_r,
-      BigInt(signature[1]),
+    expect(() => ds.verify(ds.publicKey, messageHash, n, s)).toThrow(
+      'r or s are not in the valid range [1, n-1].',
     )
-  }).toThrowError('r or s are not in the valid range [1, curve order - 1].')
-
-  expect(() => {
-    ds.verify_signature(
-      ds.public_key,
-      message_hash,
-      BigInt(signature[0]),
-      invalid_s,
+    expect(() => ds.verify(ds.publicKey, messageHash, r, 0n)).toThrow(
+      'r or s are not in the valid range [1, n-1].',
     )
-  }).toThrowError('r or s are not in the valid range [1, curve order - 1].')
+  })
+
+  // signMessage hashes the message with SHA-256, then signs the integer hash
+  test('signMessage and verifyMessage with SHA-256', async () => {
+    const message = 'Hello, ECDSA!'
+    const [r, s] = await ds.signMessage(message)
+    expect(await ds.verifyMessage(ds.publicKey, message, r, s)).toBe(true)
+  })
+
+  // Q = d·G must lie on the curve
+  test('public key Q = d·G is on the curve', () => {
+    expect(ds.publicKey.isOnCurve()).toBe(true)
+  })
+
+  // signMessage/verifyMessage with a custom hash function
+  test('signMessage and verifyMessage with custom hash function', async () => {
+    const customHash = async (msg) => {
+      // Simple deterministic "hash" for testing: hex of char codes
+      let hex = ''
+      const str = typeof msg === 'string' ? msg : String.fromCharCode(...msg)
+      for (let i = 0; i < str.length; i++) {
+        hex += str.charCodeAt(i).toString(16).padStart(2, '0')
+      }
+      return hex.padStart(64, '0')
+    }
+    const message = 'custom hash test'
+    const [r, s] = await ds.signMessage(message, customHash)
+    expect(
+      await ds.verifyMessage(ds.publicKey, message, r, s, customHash),
+    ).toBe(true)
+  })
+
+  // signMessage with Uint8Array input
+  test('signMessage and verifyMessage with Uint8Array input', async () => {
+    const message = new Uint8Array([72, 101, 108, 108, 111]) // "Hello"
+    const [r, s] = await ds.signMessage(message)
+    expect(await ds.verifyMessage(ds.publicKey, message, r, s)).toBe(true)
+  })
+
+  // verify rejects a tampered signature
+  test('verify rejects tampered signature', () => {
+    const messageHash = 123456789n
+    const [r, s] = ds.sign(messageHash)
+    // Tamper with the hash
+    expect(ds.verify(ds.publicKey, messageHash + 1n, r, s)).toBe(false)
+  })
+
+  // DigitalSignature with a different curve
+  test('works with secp384r1', () => {
+    const ds384 = new DigitalSignature(42n, 'secp384r1')
+    const hash = 0xabcdefn
+    const [r, s] = ds384.sign(hash)
+    expect(ds384.verify(ds384.publicKey, hash, r, s)).toBe(true)
+  })
 })
 
-const encoder = new Koblitz('secp521r1')
-const decoder = new Koblitz('secp521r1')
+// ---------------------------------------------------------------------------
+// Koblitz encoding
+//
+// Maps a text message to a point on an elliptic curve:
+//   1. Convert string → integer m  (base-α positional encoding, α = alphabet_size)
+//   2. For j = 1, 2, ..., 99:
+//        x = (100·m + j) mod p
+//        Compute s = x³ + ax + b (mod p)
+//        If s is a quadratic residue, compute y = √s and return (Point(x,y), j)
+//
+// Decoding reverses the process:
+//   m = (x - j) / 100
+//   Convert integer m → string via base-α decomposition
+//
+// Failure probability after 99 attempts: ≈ 2⁻⁹⁹
+// ---------------------------------------------------------------------------
 
-test('koblitz: encode throws error for unsupported alphabet size', () => {
-  const encoder = new Koblitz()
-  const message = 'Test message'
+describe('Koblitz encoding', () => {
+  test('encode/decode roundtrip with Unicode alphabet (secp192k1)', () => {
+    const kob = new Koblitz('secp192k1', 65536n)
+    const message = 'Hello, EC!'
+    const [point, j] = kob.encode(message)
+    expect(kob.decode(point, j)).toBe(message)
+  })
 
-  expect(() => {
-    encoder.encode(message, 250n)
-  }).toThrow('Alphabet size not supported')
-})
+  test('encode/decode roundtrip with ASCII alphabet (secp192k1)', () => {
+    const kob = new Koblitz('secp192k1', 256n)
+    const message = 'Hello, EC!'
+    const [point, j] = kob.encode(message)
+    expect(kob.decode(point, j)).toBe(message)
+  })
 
-test('koblitz: decode throws error for unsupported alphabet size', () => {
-  const decoder = new Koblitz()
-  const point = { x: 1n, y: 1n }
-  const j = 0n
+  test('encode/decode with default settings (secp521r1, ASCII)', () => {
+    const kob = new Koblitz()
+    const message = 'Hello, Elliptic Curve Cryptography!'
+    const [point, j] = kob.encode(message)
+    expect(kob.decode(point, j)).toBe(message)
+  })
 
-  expect(() => {
-    decoder.decode(point, j, 250n)
-  }).toThrow('Alphabet size not supported')
-})
+  test('default curve is secp521r1', () => {
+    expect(new Koblitz().curveName).toBe('secp521r1')
+  })
 
-test('koblitz: encode and decode ascii', () => {
-  const message = 'Hello, EC!'
-  const encode = encoder.encode(message, 2n ** 8n)
-  const encoded_point = encode[0]
-  const j = encode[1]
-  const decoded_message = decoder.decode(encoded_point, j, 2n ** 8n)
-  expect(decoded_message).toBe(message)
-})
+  test('default alphabet size is 256 (ASCII)', () => {
+    expect(new Koblitz().alphabetSize).toBe(256n)
+  })
 
-test('koblitz: should serialize and deserialize points and auxiliary values', () => {
-  const message = 'Hello, EC!'
-  const encoded = encoder.encode(message, 2n ** 8n)
-  const serialized = encoder.serialize([encoded])
-  const deserialized = encoder.deserialize(serialized)
-  expect(deserialized[0][0].x).toEqual(encoded[0].x)
-  expect(deserialized[0][0].y).toEqual(encoded[0].y)
-  expect(deserialized[0][1]).toEqual(encoded[1])
-})
-
-test('koblitz: encode and decode lengthy ascii', () => {
-  const message = `Morbi nibh dolor, tempus vel arcu eget, sagittis scelerisque mi. Curabitur aliquet tempus odio, vitae rutrum tortor mollis sit amet. Aliquam finibus sapien eu urna efficitur cursus. Nullam ultricies justo et magna molestie, non tincidunt lacus fringilla. Nulla facilisi. Nullam commodo aliquam placerat. Vivamus imperdiet diam id tincidunt ultrices. Nulla vitae odio massa. Nullam rhoncus scelerisque quam vel scelerisque. Duis ac diam quam. Ut volutpat, tellus a vehicula aliquet, ipsum velit maximus ligula, vel fringilla urna libero vel orci. Nulla iaculis tristique sapien in faucibus. Nullam euismod hendrerit sapien, id pulvinar ipsum dictum non.
-  Suspendisse aliquet leo non vulputate lacinia. Mauris sed malesuada sem, sit amet cursus erat. Donec ac cursus dui. Sed at facilisis arcu. Phasellus at pulvinar lorem, tristique fermentum mauris. Donec commodo consequat eros, ut facilisis risus. Donec eget nunc accumsan, scelerisque lectus non, lobortis urna. Mauris non volutpat enim. Curabitur dignissim lorem lacus, elementum luctus odio bibendum at. Praesent rhoncus magna metus, ut vehicula est sodales a. Donec euismod tristique nisl quis sagittis.
-  Nam vehicula magna bibendum, posuere enim tempor, ultricies lacus. Vivamus in lorem magna. Nam interdum fringilla laoreet. Nullam convallis dolor quis urna facilisis faucibus a eget mi. Aenean volutpat leo sit amet lorem facilisis malesuada. Suspendisse nec fermentum ex, ut blandit dolor. Aenean id erat sed magna dignissim auctor. Vestibulum a nisi et augue tempus ornare. Maecenas non faucibus purus. Morbi lorem ante, venenatis viverra est a, ultricies auctor enim.
-  Cras pellentesque porttitor enim, sit amet vulputate sapien ultricies at. Integer ac mattis ante, at suscipit mi. Sed sed est viverra ligula vestibulum rutrum. In interdum ante in mauris posuere vulputate. Cras et neque vel sapien fermentum luctus et eu quam. Etiam vel risus est. Vestibulum vestibulum nisi sed commodo feugiat. Nunc a condimentum quam. Curabitur eget urna libero. Cras ultrices fringilla erat non consequat. In tristique vulputate scelerisque.
-  Praesent sit amet nunc sit amet tortor condimentum vestibulum sed ac ex. Aliquam sit amet lacinia enim, sed lacinia felis. Cras maximus ornare lorem, ut tempor orci luctus in. Curabitur rutrum ligula eget turpis posuere suscipit. Duis varius ex magna, sed scelerisque odio sagittis non. Ut ut gravida magna, a ultricies nibh. Praesent porttitor dapibus leo vitae rutrum. Quisque gravida finibus lorem. In eu cursus mi. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Integer in metus convallis, efficitur nulla vel, sollicitudin velit. Suspendisse mattis sit amet odio non volutpat.
-  Vivamus vulputate quam at hendrerit euismod. Phasellus nec vehicula nisi. Nam at diam libero. Aenean porttitor gravida tortor, eu tristique risus aliquet in. Maecenas eros libero, faucibus vel ornare ut, molestie at massa. Pellentesque semper posuere urna, et commodo nisl porttitor eget. Duis a augue gravida, rutrum lacus eget, fringilla lacus. Curabitur scelerisque rutrum pulvinar. Aliquam sagittis ipsum eget felis lacinia, in aliquam dui congue. Nulla consectetur sit amet dui ut euismod.
-  Aliquam posuere faucibus semper. Donec ullamcorper dui egestas risus rhoncus mollis. Nunc id metus pulvinar, tempor justo in, ornare tortor. Aenean id venenatis felis, ut euismod nisi. Quisque a ante tristique, blandit risus nec, scelerisque arcu. Praesent placerat efficitur turpis, vitae mattis massa sollicitudin vel. Integer ut lectus efficitur lectus eleifend consectetur et sed tellus. Morbi elementum, nulla sed pulvinar tincidunt, massa nulla sagittis orci, ultricies tincidunt felis arcu commodo turpis. Morbi sollicitudin magna dui, vel iaculis metus ullamcorper sit amet. Donec sit amet volutpat est, et hendrerit massa. Aenean aliquam feugiat erat, ac vehicula mauris dictum vel. Suspendisse aliquet dui ultrices mi ultricies, vel dignissim lectus feugiat. Curabitur sodales nisi eu tellus pharetra, ac dictum tellus pellentesque. Donec egestas sem ac condimentum placerat.
-  Sed vel eleifend augue. Vestibulum lacinia pellentesque nibh, a scelerisque ante. Sed accumsan, orci vitae commodo consectetur, lorem neque lacinia nisl, a interdum mauris dolor rhoncus libero. Praesent malesuada consectetur semper. Maecenas cursus, diam quis ultrices volutpat, nisi neque imperdiet dolor, non porttitor justo elit id eros. Sed sodales tempus arcu, eget tempor dolor aliquam et. Quisque id tortor a arcu viverra cursus. Suspendisse elementum efficitur ante, id facilisis est consectetur pretium. Nam cursus turpis eu aliquam tempus. Morbi egestas risus sit amet lacinia elementum. Nunc tincidunt sit amet odio at molestie. Maecenas pretium consequat fermentum.`
-  const encoded_points = encoder.encode(message, 2n ** 8n, true)
-  const decoded_message = decoder.decode(encoded_points, 0n, 2n ** 8n, true)
-  expect(decoded_message).toBe(message)
-})
-
-test('koblitz: encode and decode unicode', () => {
-  const message = 'Hello, EC!'
-  const encode = encoder.encode(message, 2n ** 16n)
-  const encoded_point = encode[0]
-  const j = encode[1]
-  const decoded_message = decoder.decode(encoded_point, j, 2n ** 16n)
-  expect(decoded_message).toBe(message)
-})
-
-test('koblitz: encode and decode lengthy unicode', () => {
-  const message = `Morbi nibh dolor, tempus vel arcu eget, sagittis scelerisque mi. Curabitur aliquet tempus odio, vitae rutrum tortor mollis sit amet. Aliquam finibus sapien eu urna efficitur cursus. Nullam ultricies justo et magna molestie, non tincidunt lacus fringilla. Nulla facilisi. Nullam commodo aliquam placerat. Vivamus imperdiet diam id tincidunt ultrices. Nulla vitae odio massa. Nullam rhoncus scelerisque quam vel scelerisque. Duis ac diam quam. Ut volutpat, tellus a vehicula aliquet, ipsum velit maximus ligula, vel fringilla urna libero vel orci. Nulla iaculis tristique sapien in faucibus. Nullam euismod hendrerit sapien, id pulvinar ipsum dictum non.
-    Suspendisse aliquet leo non vulputate lacinia. Mauris sed malesuada sem, sit amet cursus erat. Donec ac cursus dui. Sed at facilisis arcu. Phasellus at pulvinar lorem, tristique fermentum mauris. Donec commodo consequat eros, ut facilisis risus. Donec eget nunc accumsan, scelerisque lectus non, lobortis urna. Mauris non volutpat enim. Curabitur dignissim lorem lacus, elementum luctus odio bibendum at. Praesent rhoncus magna metus, ut vehicula est sodales a. Donec euismod tristique nisl quis sagittis.
-    Nam vehicula magna bibendum, posuere enim tempor, ultricies lacus. Vivamus in lorem magna. Nam interdum fringilla laoreet. Nullam convallis dolor quis urna facilisis faucibus a eget mi. Aenean volutpat leo sit amet lorem facilisis malesuada. Suspendisse nec fermentum ex, ut blandit dolor. Aenean id erat sed magna dignissim auctor. Vestibulum a nisi et augue tempus ornare. Maecenas non faucibus purus. Morbi lorem ante, venenatis viverra est a, ultricies auctor enim.
-    Cras pellentesque porttitor enim, sit amet vulputate sapien ultricies at. Integer ac mattis ante, at suscipit mi. Sed sed est viverra ligula vestibulum rutrum. In interdum ante in mauris posuere vulputate. Cras et neque vel sapien fermentum luctus et eu quam. Etiam vel risus est. Vestibulum vestibulum nisi sed commodo feugiat. Nunc a condimentum quam. Curabitur eget urna libero. Cras ultrices fringilla erat non consequat. In tristique vulputate scelerisque.
-    Praesent sit amet nunc sit amet tortor condimentum vestibulum sed ac ex. Aliquam sit amet lacinia enim, sed lacinia felis. Cras maximus ornare lorem, ut tempor orci luctus in. Curabitur rutrum ligula eget turpis posuere suscipit. Duis varius ex magna, sed scelerisque odio sagittis non. Ut ut gravida magna, a ultricies nibh. Praesent porttitor dapibus leo vitae rutrum. Quisque gravida finibus lorem. In eu cursus mi. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Integer in metus convallis, efficitur nulla vel, sollicitudin velit. Suspendisse mattis sit amet odio non volutpat.
-    Vivamus vulputate quam at hendrerit euismod. Phasellus nec vehicula nisi. Nam at diam libero. Aenean porttitor gravida tortor, eu tristique risus aliquet in. Maecenas eros libero, faucibus vel ornare ut, molestie at massa. Pellentesque semper posuere urna, et commodo nisl porttitor eget. Duis a augue gravida, rutrum lacus eget, fringilla lacus. Curabitur scelerisque rutrum pulvinar. Aliquam sagittis ipsum eget felis lacinia, in aliquam dui congue. Nulla consectetur sit amet dui ut euismod.
-    Aliquam posuere faucibus semper. Donec ullamcorper dui egestas risus rhoncus mollis. Nunc id metus pulvinar, tempor justo in, ornare tortor. Aenean id venenatis felis, ut euismod nisi. Quisque a ante tristique, blandit risus nec, scelerisque arcu. Praesent placerat efficitur turpis, vitae mattis massa sollicitudin vel. Integer ut lectus efficitur lectus eleifend consectetur et sed tellus. Morbi elementum, nulla sed pulvinar tincidunt, massa nulla sagittis orci, ultricies tincidunt felis arcu commodo turpis. Morbi sollicitudin magna dui, vel iaculis metus ullamcorper sit amet. Donec sit amet volutpat est, et hendrerit massa. Aenean aliquam feugiat erat, ac vehicula mauris dictum vel. Suspendisse aliquet dui ultrices mi ultricies, vel dignissim lectus feugiat. Curabitur sodales nisi eu tellus pharetra, ac dictum tellus pellentesque. Donec egestas sem ac condimentum placerat.
-    Sed vel eleifend augue. Vestibulum lacinia pellentesque nibh, a scelerisque ante. Sed accumsan, orci vitae commodo consectetur, lorem neque lacinia nisl, a interdum mauris dolor rhoncus libero. Praesent malesuada consectetur semper. Maecenas cursus, diam quis ultrices volutpat, nisi neque imperdiet dolor, non porttitor justo elit id eros. Sed sodales tempus arcu, eget tempor dolor aliquam et. Quisque id tortor a arcu viverra cursus. Suspendisse elementum efficitur ante, id facilisis est consectetur pretium. Nam cursus turpis eu aliquam tempus. Morbi egestas risus sit amet lacinia elementum. Nunc tincidunt sit amet odio at molestie. Maecenas pretium consequat fermentum.`
-  const encoded_points = encoder.encode(message, 2n ** 16n, true)
-  const decoded_message = decoder.decode(encoded_points, 0n, 2n ** 16n, true)
-  expect(decoded_message).toBe(message)
+  // The encoded point must satisfy y² ≡ x³ + ax + b (mod p)
+  test('encoded point lies on the curve', () => {
+    const [point] = new Koblitz().encode('Test')
+    expect(point.isOnCurve()).toBe(true)
+  })
 })

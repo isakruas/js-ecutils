@@ -1,14 +1,17 @@
-// Importing all exports from core.js
-import * as core from './core.js'
+// Core
+export { Point } from './core/point.js'
+export { CurveParams, CoordinateSystem } from './core/curve.js'
 
-// Importing all exports from curves.js
-import * as curves from './curves.js'
+// Curves
+export { getCurve, getGenerator } from './curves/registry.js'
 
-// Importing all exports from algorithms.js
-import * as algorithms from './algorithms.js'
+// Algorithms
+export { DigitalSignature } from './algorithms/digital_signature.js'
+export { Koblitz } from './algorithms/koblitz.js'
 
-// Importing all exports from protocols.js
-import * as protocols from './protocols.js'
+// Protocols
+export { DiffieHellman } from './protocols/diffie_hellman.js'
+export { MasseyOmura } from './protocols/massey_omura.js'
 
-// Now you can access all exports from each file
-export { core, curves, algorithms, protocols }
+// Utils
+export { isQuadraticResidue, modularSqrt } from './utils/math.js'

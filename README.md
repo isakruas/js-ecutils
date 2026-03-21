@@ -8,28 +8,32 @@
 [![Downloads](https://img.shields.io/npm/dw/js-ecutils.svg)](https://www.npmjs.com/package/js-ecutils)
 [![codecov](https://codecov.io/gh/isakruas/js-ecutils/branch/master/graph/badge.svg)](https://codecov.io/gh/isakruas/js-ecutils)
 
-`js-ecutils` is a JavaScript library designed for implementing Elliptic Curve Cryptography (ECC) algorithms, including key exchanges (Diffie-Hellman, Massey-Omura), ECDSA signatures, and Koblitz encoding. This library is suitable for educational purposes in cryptography and for use in secure systems.
+`js-ecutils` is a JavaScript library for Elliptic Curve Cryptography (ECC) on short Weierstrass curves (y² = x³ + ax + b over a prime field F_p). It provides ECDSA digital signatures, key exchange protocols (Diffie-Hellman, Massey-Omura), Koblitz message encoding, SEC 1 point compression, and both affine and Jacobian coordinate arithmetic. Suitable for cryptography education and secure systems.
 
 ## Features
 
-- ECDSA signatures
-- Key exchange protocols (Diffie-Hellman and Massey-Omura)
-- Koblitz encoding
-- Support for elliptic curve operations
+- **Point arithmetic** — addition, doubling, scalar multiplication in affine and Jacobian coordinates
+- **8 standard curves** — secp192k1, secp192r1, secp224k1, secp224r1, secp256k1, secp256r1, secp384r1, secp521r1
+- **ECDSA signatures** — `sign()`, `verify()`, `signMessage()`, `verifyMessage()` with SHA-256
+- **Koblitz encoding** — encode/decode text messages as elliptic curve points
+- **Diffie-Hellman key exchange** — ECDH shared secret computation
+- **Massey-Omura three-pass protocol** — key-free message exchange via encrypt/decrypt
+- **SEC 1 point compression** — `compress()`, `decompress()`, `compressSec1()`, `toUncompressedSec1()`, `fromSec1()`
+- **Modular arithmetic utilities** — modular square root (Tonelli-Shanks), quadratic residue testing
+- **Secure nonce generation** — uses `crypto.getRandomValues()` (CSPRNG) instead of `Math.random()`
+- **Cross-platform** — works in Node.js and browsers (Web Crypto API)
 
 ## Table of Contents
 
 - [Installation](#installation)
-- [Usage](#usage)
+- [Quick Start](#quick-start)
 - [API Documentation](#api-documentation)
 - [Examples](#examples)
 - [Contributing](#contributing)
 - [License](#license)
-- [Language-Specific Libraries for Elliptic Curve Cryptography](#language-specific-libraries-for-elliptic-curve-cryptography)
+- [Related Libraries](#related-libraries)
 
 ## Installation
-
-To install `js-ecutils`, you can use npm or include the script directly in your web application:
 
 **Using npm:**
 
@@ -37,418 +41,392 @@ To install `js-ecutils`, you can use npm or include the script directly in your 
 npm install js-ecutils
 ```
 
-**Or, for web usage:**  
-Include the following script in your HTML:
+**Or, for web usage:**
 
 ```html
 <script src="https://unpkg.com/js-ecutils@latest/dist/web/min.js"></script>
 ```
 
-## Usage
+## Quick Start
 
-After installing the `js-ecutils` library, you can import it into your JavaScript project or use it directly in a browser. Below are the steps for using the library in both environments.
-
-### Using in Node.js
-
-To use the library in a Node.js project, import the required modules as shown below:
+### Node.js
 
 ```javascript
-// Importing necessary classes
-const { core: { Point, EllipticCurve } } = require('js-ecutils');
+const {
+  Point, CurveParams, getCurve, getGenerator,
+  DigitalSignature, Koblitz,
+  DiffieHellman, MasseyOmura
+} = require('js-ecutils')
 
-// Defining parameters for the elliptic curve
-const p = 23n;  // The prime number defining the finite field's order
-const a = 1n;   // The 'a' coefficient in the curve equation
-const b = 1n;   // The 'b' coefficient in the curve equation
-const G = new Point(0n, 1n);  // Generator point
-const n = 28n;  // Order of the point
-const h = 1n;   // Cofactor
+// Point arithmetic on a toy curve  y² = x³ + x + 1  over F₂₃
+const curve = new CurveParams({ p: 23n, a: 1n, b: 1n, n: 28n, h: 1n })
+const P = new Point(0n, 1n, curve)
+const Q = new Point(6n, 19n, curve)
+const R = P.add(Q)
+console.log(`P + Q = (${R.x}, ${R.y})`)  // (13, 16)
 
-// Creating an instance of the elliptic curve
-const curve = new EllipticCurve(p=p, a=a, b=b, G=G, n=n, h=h);
-
-// Defining points on the curve
-const point1 = new Point(6n, 19n);
-const point2 = new Point(3n, 13n);
-
-// Adding the points
-const sum_point = curve.add_points(point1, point2);
-console.log(`The sum of the points is (${sum_point.x}, ${sum_point.y}).`);
+// Scalar multiplication on secp256k1
+const G = getGenerator('secp256k1')
+const pubKey = G.mul(42n)
+console.log(`42·G = (${pubKey.x}, ${pubKey.y})`)
 ```
 
-### Using in Browsers
-
-To use the library in a browser, include the JavaScript file in your HTML and utilize the classes available in the global `ecutils` object. Add the script as shown below:
+### Browser
 
 ```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elliptic Curve Cryptography Example</title>
+    <title>js-ecutils Example</title>
     <script src="https://unpkg.com/js-ecutils@latest/dist/web/min.js"></script>
     <script>
         window.onload = function() {
-            // Importing necessary classes from the global object
-            const Point = window.ecutils.core.Point;
-            const EllipticCurve = window.ecutils.core.EllipticCurve;
+            const { Point, CurveParams } = window.ecutils
 
-            // Defining parameters for the elliptic curve
-            const p = 23n;
-            const a = 1n;
-            const b = 1n;
-            const G = new Point(0n, 1n);
-            const n = 28n;
-            const h = 1n;
-
-            // Creating an instance of the elliptic curve
-            const curve = new EllipticCurve(p, a, b, G, n, h);
-
-            // Defining points on the curve
-            const point1 = new Point(6n, 19n);
-            const point2 = new Point(3n, 13n);
-
-            // Adding the points
-            const sum_point = curve.add_points(point1, point2);
-            console.log(`The sum of the points is (${sum_point.x}, ${sum_point.y}).`);
-        };
+            const curve = new CurveParams({ p: 23n, a: 1n, b: 1n, n: 28n, h: 1n })
+            const P = new Point(0n, 1n, curve)
+            const Q = new Point(6n, 19n, curve)
+            const R = P.add(Q)
+            console.log(`P + Q = (${R.x}, ${R.y})`)
+        }
     </script>
 </head>
 <body>
-    <h1>Example using js-ecutils Library</h1>
+    <h1>js-ecutils Example</h1>
 </body>
 </html>
 ```
 
 ## API Documentation
 
-### Classes and Methods
+### Core
 
-#### Class: `DigitalSignature`
+#### `Point`
 
-##### Constructor
-- **`new DigitalSignature(private_key, curve_name = 'secp192k1')`**
-  - Creates a new instance of the `DigitalSignature` class for performing ECDSA (Elliptic Curve Digital Signature Algorithm) operations.
-  - **Parameters**:
-    - `private_key`: The private key used for generating a signature.
-    - `curve_name`: (Optional) The name of the elliptic curve to use. Defaults to `'secp192k1'`.
+Represents a point on an elliptic curve. The identity element (point at infinity) is represented as `Point(0n, 0n)`.
 
-##### Methods
+```javascript
+const { Point, CurveParams } = require('js-ecutils')
 
-- **`generate_signature(message_hash)`**
-  - Generates an ECDSA signature for a given message hash using the private key.
-  - **Parameters**:
-    - `message_hash`: The hash of the message to be signed.
-  - **Returns**: An array with two integers `[r, s]` representing the signature.
+const curve = new CurveParams({ p: 23n, a: 1n, b: 1n, n: 28n, h: 1n })
+const P = new Point(0n, 1n, curve)
+```
 
-- **`verify_signature(public_key, message_hash, r, s)`**
-  - Verifies the authenticity of an ECDSA signature.
-  - **Parameters**:
-    - `public_key`: The public key corresponding to the private key of the signer.
-    - `message_hash`: The hash of the message that was signed.
-    - `r`: The first component (r) of the signature.
-    - `s`: The second component (s) of the signature.
-  - **Returns**: `true` if the signature is valid, `false` otherwise.
+**Constructor:** `new Point(x, y, curve, _trusted)`
+- `x` — x-coordinate (BigInt)
+- `y` — y-coordinate (BigInt)
+- `curve` — `CurveParams` instance (optional, can be borrowed from another point during operations)
+- `_trusted` — skip on-curve validation (internal use only)
 
-##### Attributes
+**Properties:**
+- `isIdentity` — `true` if this is the point at infinity
 
-- **`curve`**: Lazily retrieves the elliptic curve associated with the signature scheme based on the `curve_name`.
-  
-- **`public_key`**: Computes and returns the public key from the private key.
-
----
-
-#### Class: `Koblitz`
-
-##### Constructor
-
-- **`new Koblitz(curve_name = 'secp521r1')`**
-  - Creates a new instance of the `Koblitz` encoding/decoding class.
-  - **Parameters**:
-    - `curve_name`: (Optional) The name of the elliptic curve. Defaults to `'secp521r1'`.
-
-##### Methods
-
-- **`encode(message, alphabet_size = 256n)`**
-  - Encodes a textual message into a point on the elliptic curve using the Koblitz method.
-  - **Parameters**:
-    - `message`: The message to encode.
-    - `alphabet_size`: (Optional) The size of the alphabet. Defaults to `256n`.
-  - **Returns**: A tuple `[Point, j]` where `Point` is the encoded curve point and `j` is an auxiliary value.
-
-- **`decode(point, j, alphabet_size = 256n)`**
-  - Decodes a point on the elliptic curve back into a textual message.
-  - **Parameters**:
-    - `point`: The `Point` on the elliptic curve that represents the encoded message.
-    - `j`: The auxiliary value `j` used in encoding.
-    - `alphabet_size`: (Optional) The size of the alphabet. Defaults to `256n`.
-  - **Returns**: The decoded message as a string.
-
-- **`serialize(points)`**
-  - Serializes points and the corresponding `j` values into a JSON-friendly format.
-  - **Parameters**:
-    - `points`: An array of tuples `[Point, j]` where `Point` is the encoded curve point.
-  - **Returns**: An array of objects in the format `{x, y, j}` representing the serialized points.
-
-- **`deserialize(serializedPoints)`**
-  - Deserializes the JSON format back to an array of tuples `[Point, j]`.
-  - **Parameters**:
-    - `serializedPoints`: An array of objects `{x, y, j}`.
-  - **Returns**: An array of tuples `[Point, j]`.
-
-##### Attributes
-
-- **`curve`**: Lazily retrieves the elliptic curve for message encoding/decoding.
+**Methods:**
+- `isOnCurve()` — verifies y² ≡ x³ + ax + b (mod p)
+- `neg()` — additive inverse: returns (x, p - y)
+- `add(other)` — point addition: P + Q
+- `sub(other)` — point subtraction: P - Q
+- `mul(k)` — scalar multiplication: k·P (double-and-add)
+- `compress()` — returns `[x, yParity]` where yParity is 0n or 1n
+- `decompress(x, yParity, curve)` — (static) recovers a point from compressed form
+- `compressSec1()` — SEC 1 compressed format (Uint8Array: `02`/`03` prefix + x)
+- `toUncompressedSec1()` — SEC 1 uncompressed format (Uint8Array: `04` prefix + x + y)
+- `fromSec1(data, curve)` — (static) parses SEC 1 compressed or uncompressed bytes
+- `toString()` — human-readable representation
 
 ---
 
-#### Class: `DiffieHellman`
+#### `CurveParams`
 
-##### Constructor
+Immutable container for elliptic curve domain parameters.
 
-- **`new DiffieHellman(private_key, curve_name = 'secp192k1')`**
-  - Creates an instance of the `DiffieHellman` class for performing Diffie-Hellman key exchange using elliptic curves.
-  - **Parameters**:
-    - `private_key`: The private key to use during the key exchange.
-    - `curve_name`: (Optional) The name of the elliptic curve. Defaults to `'secp192k1'`.
+```javascript
+const { CurveParams, CoordinateSystem } = require('js-ecutils')
 
-##### Methods
+const curve = new CurveParams({
+  p: 23n, a: 1n, b: 1n, n: 28n, h: 1n,
+  coord: CoordinateSystem.JACOBIAN  // default
+})
+```
 
-- **`compute_shared_secret(other_public_key)`**
-  - Computes the shared secret using the private key and the other party's public key.
-  - **Parameters**:
-    - `other_public_key`: The other party's public key (as a `Point`).
-  - **Returns**: A point representing the shared secret on the elliptic curve.
+**Constructor:** `new CurveParams({ p, a, b, n, h, coord })`
+- `p` — prime modulus of the finite field F_p
+- `a`, `b` — curve equation coefficients (y² = x³ + ax + b)
+- `n` — order of the generator point
+- `h` — cofactor (default: 1n)
+- `coord` — coordinate system: `CoordinateSystem.AFFINE` or `CoordinateSystem.JACOBIAN` (default)
 
-##### Attributes
-
-- **`curve`**: Retrieves the elliptic curve associated with the Diffie-Hellman exchange.
-  
-- **`public_key`**: Computes the Diffie-Hellman public key from the private key.
+Validates that the discriminant 4a³ + 27b² ≢ 0 (mod p), ensuring the curve is non-singular.
 
 ---
 
-#### Class: `MasseyOmura`
+#### `CoordinateSystem`
 
-##### Constructor
+Enum for selecting the internal arithmetic representation.
 
-- **`new MasseyOmura(private_key, curve_name = 'secp192k1')`**
-  - Creates an instance of the `MasseyOmura` class for performing Massey-Omura key exchange using elliptic curves.
-  - **Parameters**:
-    - `private_key`: The private key to use during the key exchange.
-    - `curve_name`: (Optional) The name of the elliptic curve. Defaults to `'secp192k1'`.
-
-##### Methods
-
-- **`first_encryption_step(message)`**
-  - Encrypts a message with the sender's private key.
-  - **Parameters**:
-    - `message`: The message (as a point) to encrypt.
-  - **Returns**: The encrypted message (as a `Point`).
-
-- **`second_encryption_step(encrypted_message)`**
-  - Applies the receiver's private key to complete encryption steps. Used in the key exchange process.
-  - **Parameters**:
-    - `encrypted_message`: The encrypted message (as a `Point`).
-  - **Returns**: The resulting encrypted message.
-
-- **`partial_decryption_step(encrypted_message)`**
-  - Partially decrypts a message using the inverse of the sender's private key.
-  - **Parameters**:
-    - `encrypted_message`: The encrypted message (as a `Point`).
-  - **Returns**: The decrypted message (as a `Point`).
-
-##### Attributes
-
-- **`curve`**: Retrieves the elliptic curve associated with the Massey-Omura exchange.
-  
-- **`public_key`**: Computes and returns the Massey-Omura public key from the private key.
+- `CoordinateSystem.AFFINE` — standard (x, y) coordinates, uses modular inversion per operation
+- `CoordinateSystem.JACOBIAN` — projective (X, Y, Z) coordinates where x = X/Z², y = Y/Z³, ~3x faster
 
 ---
 
-#### Class: `EllipticCurve`
+### Curves
 
-- **This is an internal class representing an elliptic curve and offering operations on points and scalar multiplications.**
+#### `getCurve(name)` / `getGenerator(name)`
 
-##### Constructor
+Look up standard curve parameters and generator points by name.
 
-- **`new EllipticCurve(p, a, b, G, n, h)`**
-  - Initializes an elliptic curve instance.
-  - **Parameters**:
-    - `p`: The prime modulus of the field.
-    - `a`: The `'a'` coefficient of the curve equation.
-    - `b`: The `'b'` coefficient of the curve equation.
-    - `G`: The base point (generator) on the curve.
-    - `n`: The order of the base point.
-    - `h`: The cofactor of the curve.
-  
-##### Methods
+```javascript
+const { getCurve, getGenerator } = require('js-ecutils')
 
-- **`add_points(P, Q)`**
-  - Adds two points `P` and `Q` on the elliptic curve.
-  - **Parameters**:
-    - `P`: The first point.
-    - `Q`: The second point.
-  - **Returns**: The resulting point `R = P + Q`.
+const curve = getCurve('secp256k1')   // returns CurveParams
+const G = getGenerator('secp256k1')   // returns Point (generator)
+```
 
-- **`multiply_point(k, P)`**
-  - Multiplies a point `P` with a scalar `k`.
-  - **Parameters**:
-    - `k`: Scalar (integer) to multiply.
-    - `P`: The point to be multiplied.
-  - **Returns**: Point `kP`.
+**Supported curves:** `secp192k1`, `secp192r1`, `secp224k1`, `secp224r1`, `secp256k1`, `secp256r1`, `secp384r1`, `secp521r1`
 
-- **`is_point_on_curve(p)`**
-  - Verifies if a point is on the elliptic curve.
-  - **Parameters**:
-    - `p`: The point to evaluate.
-  - **Returns**: `true` if the point is on the curve, otherwise `false`.
+Lookup is case-insensitive. Throws an error for unknown curve names.
+
+---
+
+### Algorithms
+
+#### `DigitalSignature`
+
+ECDSA signature generation and verification.
+
+```javascript
+const { DigitalSignature } = require('js-ecutils')
+
+const ds = new DigitalSignature(123456n, 'secp256k1')
+```
+
+**Constructor:** `new DigitalSignature(privateKey, curveName = 'secp256k1')`
+
+**Properties:**
+- `publicKey` — the public key point Q = d·G
+
+**Methods:**
+- `sign(messageHash)` — generates an ECDSA signature `[r, s]` for an integer hash
+- `verify(publicKey, messageHash, r, s)` — verifies a signature, returns `boolean`
+- `signMessage(message, hashFunc?)` — hashes a message (SHA-256 by default) and signs it, returns `Promise<[r, s]>`
+- `verifyMessage(publicKey, message, r, s, hashFunc?)` — hashes and verifies, returns `Promise<boolean>`
+
+The nonce k is generated using a cryptographically secure random number generator (`crypto.getRandomValues()`).
+
+---
+
+#### `Koblitz`
+
+Encode/decode text messages as elliptic curve points using Koblitz's method.
+
+```javascript
+const { Koblitz } = require('js-ecutils')
+
+const kob = new Koblitz('secp521r1')
+const [point, j] = kob.encode('Hello, world!')
+const text = kob.decode(point, j)
+// text === 'Hello, world!'
+```
+
+**Constructor:** `new Koblitz(curveName = 'secp521r1', alphabetSize = 256n)`
+- `curveName` — larger curves can encode longer messages in a single point
+- `alphabetSize` — 256n for ASCII, 65536n for Unicode
+
+**Methods:**
+- `encode(message)` — returns `[Point, j]` where j is an auxiliary value needed for decoding
+- `decode(point, j)` — recovers the original text string
+
+---
+
+### Protocols
+
+#### `DiffieHellman`
+
+Elliptic Curve Diffie-Hellman (ECDH) key exchange.
+
+```javascript
+const { DiffieHellman } = require('js-ecutils')
+
+const alice = new DiffieHellman(0xAn, 'secp256k1')
+const bob   = new DiffieHellman(0xBn, 'secp256k1')
+
+const sharedA = alice.computeSharedSecret(bob.publicKey)
+const sharedB = bob.computeSharedSecret(alice.publicKey)
+// sharedA.x === sharedB.x && sharedA.y === sharedB.y
+```
+
+**Constructor:** `new DiffieHellman(privateKey, curveName = 'secp256k1')`
+
+**Properties:**
+- `publicKey` — H = d·G
+
+**Methods:**
+- `computeSharedSecret(otherPublicKey)` — returns the shared secret point S = d·Q_other
+
+---
+
+#### `MasseyOmura`
+
+Massey-Omura three-pass protocol for key-free message exchange.
+
+```javascript
+const { MasseyOmura, Koblitz } = require('js-ecutils')
+
+const kob   = new Koblitz('secp521r1')
+const alice = new MasseyOmura(0xA1n, 'secp521r1')
+const bob   = new MasseyOmura(0xB2n, 'secp521r1')
+
+const [M, j] = kob.encode('Secret message')
+
+const c1 = alice.encrypt(M)        // Alice → Bob
+const c2 = bob.encrypt(c1)         // Bob → Alice
+const c3 = alice.decrypt(c2)       // Alice → Bob
+const plaintext = bob.decrypt(c3)  // Bob recovers M
+
+const text = kob.decode(plaintext, j)
+// text === 'Secret message'
+```
+
+**Constructor:** `new MasseyOmura(privateKey, curveName = 'secp521r1')`
+- `privateKey` must be coprime with n (so that e⁻¹ mod n exists)
+
+**Methods:**
+- `encrypt(point)` — C = e·P (multiply by private key)
+- `decrypt(point)` — P = e⁻¹·C (multiply by modular inverse)
+
+---
+
+### Utilities
+
+#### `isQuadraticResidue(a, p)`
+
+Tests whether `a` is a quadratic residue modulo prime `p` using Euler's criterion: a^((p-1)/2) ≡ 1 (mod p).
+
+#### `modularSqrt(a, p)`
+
+Computes √a mod p. Uses the direct formula when p ≡ 3 (mod 4), otherwise falls back to the Tonelli-Shanks algorithm. Returns `null` if `a` is not a quadratic residue.
 
 ---
 
 ## Examples
 
-Here are some examples of using the key exchange protocols and other features of `js-ecutils`.
+### Point Arithmetic
 
-### Encoding and Decoding Messages with Koblitz
+```javascript
+const { Point, CurveParams, getGenerator } = require('js-ecutils')
 
-```js
-// Importing necessary classes
-const { algorithms: { Koblitz } } = require('js-ecutils');
+// Toy curve: y² = x³ + x + 1 over F₂₃ (order 28)
+const curve = new CurveParams({ p: 23n, a: 1n, b: 1n, n: 28n, h: 1n })
+const P = new Point(0n, 1n, curve)
 
-// Initialize Koblitz with a specific curve
-const koblitz = new Koblitz('secp521r1');
+// Doubling: 2·P
+const P2 = P.mul(2n)
+console.log(`2·P = (${P2.x}, ${P2.y})`)  // (6, 19)
 
-// Encode a message to a curve point
-const [point, j] = koblitz.encode('Hello, EC!', 2n ** 8n);
+// Group order: 28·P = O (identity)
+const identity = P.mul(28n)
+console.log(`28·P is identity: ${identity.isIdentity}`)  // true
 
-// Decode the curve point back to a message
-const decoded_message = koblitz.decode(point, j, 2n ** 8n);
-
-console.log(decoded_message);
+// Negation: -P = (x, p - y)
+const neg = P.neg()
+console.log(`-P = (${neg.x}, ${neg.y})`)  // (0, 22)
 ```
 
-### Digital Signatures with ECDSA
+### SEC 1 Point Compression
 
-```js
-// Importing necessary classes
-const { algorithms: { DigitalSignature } } = require('js-ecutils');
+```javascript
+const { getGenerator, Point, getCurve } = require('js-ecutils')
 
-// Create a DigitalSignature instance with your private key
-const privateKey = BigInt(123456);
-const ds = new DigitalSignature(privateKey);
+const G = getGenerator('secp256k1')
 
-// Hash of your message
-const messageHash = BigInt(545454445644654n);
+// Compress to SEC 1 format (33 bytes for 256-bit curve)
+const compressed = G.compressSec1()
+console.log(`Compressed: ${compressed[0] === 0x02 ? '02' : '03'}...`)
 
-// Generate signature
-const [r, s] = ds.generate_signature(messageHash);
+// Decompress back
+const curve = getCurve('secp256k1')
+const recovered = Point.fromSec1(compressed, curve)
+console.log(`Match: ${recovered.x === G.x && recovered.y === G.y}`)  // true
+```
 
-// Verify signature (typically on the receiver's side)
-const isValid = ds.verify_signature(ds.public_key, messageHash, r, s);
+### ECDSA Digital Signatures
 
-console.log(`Is the signature valid? ${isValid}`);
+```javascript
+const { DigitalSignature } = require('js-ecutils')
+
+const ds = new DigitalSignature(123456n, 'secp256k1')
+
+// Sign a raw hash
+const hash = 0xDEADBEEFn
+const [r, s] = ds.sign(hash)
+console.log(`Valid: ${ds.verify(ds.publicKey, hash, r, s)}`)  // true
+
+// Sign a message string (async, uses SHA-256)
+async function demo() {
+  const [r, s] = await ds.signMessage('Hello, ECDSA!')
+  const valid = await ds.verifyMessage(ds.publicKey, 'Hello, ECDSA!', r, s)
+  console.log(`Message signature valid: ${valid}`)  // true
+}
+demo()
+```
+
+### Koblitz Encoding
+
+```javascript
+const { Koblitz } = require('js-ecutils')
+
+const kob = new Koblitz('secp521r1')
+const [point, j] = kob.encode('Hello, EC!')
+const decoded = kob.decode(point, j)
+console.log(decoded)  // 'Hello, EC!'
 ```
 
 ### Diffie-Hellman Key Exchange
 
-```js
-// Importing necessary classes
-const { protocols: { DiffieHellman } } = require('js-ecutils');
+```javascript
+const { DiffieHellman } = require('js-ecutils')
 
-// Alice's side
-const alice = new DiffieHellman(12345n);
+const alice = new DiffieHellman(12345n, 'secp256k1')
+const bob   = new DiffieHellman(67890n, 'secp256k1')
 
-// Bob's side
-const bob = new DiffieHellman(67890n);
+const sharedA = alice.computeSharedSecret(bob.publicKey)
+const sharedB = bob.computeSharedSecret(alice.publicKey)
 
-// Alice computes her shared secret with Bob's public key
-const aliceSharedSecret = alice.compute_shared_secret(bob.public_key);
-
-// Bob computes his shared secret with Alice's public key
-const bobSharedSecret = bob.compute_shared_secret(alice.public_key);
-
-// Check if aliceSharedSecret is equal to bobSharedSecret
-const isSharedSecretEqual = aliceSharedSecret.x === bobSharedSecret.x && aliceSharedSecret.y === bobSharedSecret.y;
-
-console.log(`Are the shared secrets equal? ${isSharedSecretEqual}`);
+console.log(`Shared secrets match: ${sharedA.x === sharedB.x}`)  // true
 ```
 
-### Massey-Omura Key Exchange
+### Massey-Omura Three-Pass Protocol
 
-```js
-// Importing necessary classes
-const { algorithms: { Koblitz }, protocols: { MasseyOmura } } = require('js-ecutils');
+```javascript
+const { Koblitz, MasseyOmura } = require('js-ecutils')
 
-// Initialize the Koblitz instance for the elliptic curve 'secp192k1'
-const koblitz = new Koblitz('secp192k1');
+const kob   = new Koblitz('secp521r1')
+const alice = new MasseyOmura(70604135n, 'secp521r1')
+const bob   = new MasseyOmura(48239108668n, 'secp521r1')
 
-// Sender's side
-// -------------
-const privateKeySender = BigInt("70604135");
-// Initialize Massey-Omura protocol with the sender's private key
-const moSender = new MasseyOmura(privateKeySender);
+// Encode the message as a curve point
+const [M, j] = kob.encode('Hello, world!')
 
-// Encode the message using the Koblitz method
-// `j` is used to handle the ambiguity in the decoding process
-const [message, j] = koblitz.encode("Hello, world!");
+// Three-pass exchange
+const c1 = alice.encrypt(M)        // Step 1: Alice encrypts
+const c2 = bob.encrypt(c1)         // Step 2: Bob encrypts
+const c3 = alice.decrypt(c2)       // Step 3: Alice removes her encryption
+const recovered = bob.decrypt(c3)  // Step 4: Bob removes his encryption
 
-// Perform the first encryption step with Massey-Omura protocol
-const encryptedMsgSender = moSender.first_encryption_step(message);
-
-// The encoded message is now sent to the receiver...
-// (transmission of encryptedMsgSender)
-
-// Receiver's side
-// ---------------
-const privateKeyReceiver = BigInt("48239108668");
-// Initialize Massey-Omura protocol with the receiver's private key
-const moReceiver = new MasseyOmura(privateKeyReceiver);
-
-// Perform the second encryption step with Massey-Omura protocol
-const encryptedMsgReceiver = moReceiver.second_encryption_step(encryptedMsgSender);
-
-// The double-encrypted message is sent back to the sender...
-// (transmission of encryptedMsgReceiver)
-
-// Sender's side again
-// -------------------
-const partialDecryptedMsg = moSender.partial_decryption_step(encryptedMsgReceiver);
-
-// The partially decrypted message is sent back to the receiver...
-// (transmission of partialDecryptedMsg)
-
-// Receiver's final decryption
-// ---------------------------
-const originalMessage = moReceiver.partial_decryption_step(partialDecryptedMsg);
-
-// Decode the message using the Koblitz method
-// `j` is used to resolve the mapping from the elliptic curve point back to the message
-const decodedMessage = koblitz.decode(originalMessage, j);
-
-console.log(decodedMessage);
+const text = kob.decode(recovered, j)
+console.log(text)  // 'Hello, world!'
 ```
 
 ## Contributing
 
-Contributions are welcome! If you’d like to contribute to `js-ecutils`, please follow these steps:
-
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix.
-3. Make your changes and commit them.
-4. Push your branch and open a pull request.
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details. 
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## Language-Specific Libraries for Elliptic Curve Cryptography
+## Related Libraries
 
-In addition to the JavaScript module, there are other language-specific libraries available for elliptic curve cryptography:
-
-- **Python Library for Elliptic Curve Cryptography**: The `ecutils` package provides elliptic curve functionalities tailored for Python developers. You can find it on [GitHub](https://github.com/isakruas/ecutils).
-
-- **Go Library for Elliptic Curve Cryptography**: The `go-ecutils` library offers similar elliptic curve utilities for Go developers. More information and documentation can be found on [GitHub](https://github.com/isakruas/go-ecutils).
-
-These libraries enable developers to utilize elliptic curve cryptography in their preferred programming environments, ensuring flexibility and ease of integration.
+- **Python** — [`ecutils`](https://github.com/isakruas/ecutils) on PyPI
+- **Go** — [`go-ecutils`](https://github.com/isakruas/go-ecutils) on GitHub

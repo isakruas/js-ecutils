@@ -1,6 +1,6 @@
 {
   "name": "js-ecutils",
-  "version": "0.0.1-alpha",
+  "version": "0.0.2-alpha",
   "description": "JavaScript Library for Elliptic Curve Cryptography: key exchanges (Diffie-Hellman, Massey-Omura), ECDSA signatures, and Koblitz encoding. Suitable for crypto education and secure systems.",
   "repository":"https://github.com/isakruas/js-ecutils",
   "keywords": [
@@ -41,6 +41,9 @@
     "coverage": "jest dist/npm --coverage",
     "tree": "tree --prune -I 'node_modules'",
     "make": "npm run format && npm run lint && npm run clean && npm run build:npm && npm run build:web"
+  },
+  "jest": {
+    "coverageProvider": "v8"
   },
   "devDependencies": {
     "@babel/cli": "^7.24.1",

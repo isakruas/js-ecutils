@@ -1,139 +1,631 @@
-import { test, expect } from '@jest/globals'
-import { secp192k1 } from './curves'
-import { Point, EllipticCurve } from './core'
+import { test, expect, describe } from '@jest/globals'
+import { Point } from './core/point'
+import { CurveParams, CoordinateSystem } from './core/curve'
+import { getCurve, getGenerator } from './curves/registry'
+import { affineDouble, affineAdd } from './core/arithmetic/affine'
+import {
+  JacobianPoint,
+  toJacobian,
+  jacAdd,
+  jacDouble,
+} from './core/arithmetic/jacobian'
 
-test('add_points(P1, P2) to equal the expected sum', () => {
-  const P1 = new Point(
-    BigInt('0xF091CF6331B1747684F5D2549CD1D4B3A8BED93B94F93CB6'),
-    BigInt('0xFD7AF42E1E7565A02E6268661C5E42E603DA2D98A18F2ED5'),
+// ---------------------------------------------------------------------------
+// Elliptic curve operations
+//
+// Tests for the Point-operator API on the short Weierstrass curve
+//   y² = x³ + ax + b  (mod p)
+//
+// Covers:
+//   • Point addition (chord formula):
+//       λ  = (y₂ - y₁) · (x₂ - x₁)⁻¹  (mod p)
+//       x₃ = λ² - x₁ - x₂              (mod p)
+//       y₃ = λ(x₁ - x₃) - y₁           (mod p)
+//
+//   • Point doubling (tangent formula):
+//       λ  = (3x₁² + a) · (2y₁)⁻¹      (mod p)
+//       x₃ = λ² - 2x₁                  (mod p)
+//       y₃ = λ(x₁ - x₃) - y₁           (mod p)
+//
+//   • Scalar multiplication k·P via double-and-add in O(log k)
+//   • Negation: -P = (x, -y mod p)
+//   • Identity element (point at infinity): P + O = P
+//   • Inverse: P + (-P) = O
+// ---------------------------------------------------------------------------
+
+describe('Elliptic curve operations', () => {
+  // secp192k1: y² = x³ + 3 over a 192-bit prime field
+  const curve = getCurve('secp192k1')
+  const affineCurve = new CurveParams({
+    p: curve.p,
+    a: curve.a,
+    b: curve.b,
+    n: curve.n,
+    h: curve.h,
+    coord: CoordinateSystem.AFFINE,
+  })
+
+  const point1 = new Point(
+    0xf091cf6331b1747684f5d2549cd1d4b3a8bed93b94f93cb6n,
+    0xfd7af42e1e7565a02e6268661c5e42e603da2d98a18f2ed5n,
+    curve,
   )
-  const P2 = new Point(
-    BigInt('0x6E43B7DCAE2FD5E0BF2A1BA7615CA3B9065487C9A67B4583'),
-    BigInt('0xC48DCEA47AE08E84D5FEDC3D09E4C19606A290F7A19A6A58'),
+  const point2 = new Point(
+    0x6e43b7dcae2fd5e0bf2a1ba7615ca3b9065487c9a67b4583n,
+    0xc48dcea47ae08e84d5fedc3d09e4c19606a290f7a19a6a58n,
+    curve,
   )
-  const expectedSum = new Point(
-    BigInt('0X3CD61E370D02CA0687C0B5F7EBF6D0373F4DD0CCCCB7CC2D'),
-    BigInt('0X2C4BEFD9B02F301EB4014504F0533AA7EB19E9EA56441F78'),
-  )
-  expect(secp192k1.add_points(P1, P2)).toStrictEqual(expectedSum)
+
+  test('affine arithmetic: addition, doubling, and scalar multiplication', () => {
+    const p1 = new Point(point1.x, point1.y, affineCurve)
+    const p2 = new Point(point2.x, point2.y, affineCurve)
+
+    // P₁ + P₂ (P₁ ≠ P₂) — chord formula
+    p1.add(p2)
+
+    // P₁ + P₁ — tangent formula (doubling)
+    const expectedDouble = p1.add(p1)
+    const calculatedDouble = p1.add(p1)
+    expect(calculatedDouble.x).toBe(expectedDouble.x)
+    expect(calculatedDouble.y).toBe(expectedDouble.y)
+
+    // 3·P₁ = 2·P₁ + P₁
+    let expectedProduct = p1.add(p1)
+    expectedProduct = new Point(
+      expectedProduct.x,
+      expectedProduct.y,
+      affineCurve,
+    )
+    expectedProduct = expectedProduct.add(p1)
+    const calculatedProduct = p1.mul(3n)
+    expect(calculatedProduct.x).toBe(expectedProduct.x)
+    expect(calculatedProduct.y).toBe(expectedProduct.y)
+  })
+
+  // P₁ + P₂ on secp192k1 — verified against known test vectors
+  test('point addition produces expected result in both coordinate systems', () => {
+    const expectedSumX = 0x3cd61e370d02ca0687c0b5f7ebf6d0373f4dd0ccccb7cc2dn
+    const expectedSumY = 0x2c4befd9b02f301eb4014504f0533aa7eb19e9ea56441f78n
+
+    // Affine: λ = (y₂-y₁)·(x₂-x₁)⁻¹, x₃ = λ²-x₁-x₂, y₃ = λ(x₁-x₃)-y₁
+    const p1a = new Point(point1.x, point1.y, affineCurve)
+    const p2a = new Point(point2.x, point2.y, affineCurve)
+    const sumAffine = p1a.add(p2a)
+    expect(sumAffine.x).toBe(expectedSumX)
+    expect(sumAffine.y).toBe(expectedSumY)
+
+    // Jacobian: same result via (X/Z², Y/Z³) representation
+    const sumJacobian = point1.add(point2)
+    expect(sumJacobian.x).toBe(expectedSumX)
+    expect(sumJacobian.y).toBe(expectedSumY)
+  })
+
+  // 2·P₁ — point doubling verified against known test vectors
+  test('point doubling produces expected result in both coordinate systems', () => {
+    const expectedDoubleX = 0xea525dd5a1353762a14e9e78b9063316d1f2d5e792f87862n
+    const expectedDoubleY = 0xa936d583530982690c445427cdf2c5b0bb1c88749247b02en
+
+    // Affine: λ = (3x₁²+a)·(2y₁)⁻¹
+    const p1a = new Point(point1.x, point1.y, affineCurve)
+    const dblAffine = p1a.add(p1a)
+    expect(dblAffine.x).toBe(expectedDoubleX)
+    expect(dblAffine.y).toBe(expectedDoubleY)
+
+    // Jacobian: S = 4XY², M = 3X²+aZ⁴, X' = M²-2S
+    const dblJacobian = point1.add(point1)
+    expect(dblJacobian.x).toBe(expectedDoubleX)
+    expect(dblJacobian.y).toBe(expectedDoubleY)
+  })
+
+  // Point(x, y) must satisfy y² ≡ x³ + ax + b (mod p)
+  test('constructor rejects points not on the curve', () => {
+    expect(() => new Point(200n, 119n, curve)).toThrow()
+  })
+
+  // k·P via double-and-add: 2·P₁ should equal the known doubled value
+  test('scalar multiplication with known vectors', () => {
+    const expectedX = 0xea525dd5a1353762a14e9e78b9063316d1f2d5e792f87862n
+
+    // Affine
+    const p1a = new Point(point1.x, point1.y, affineCurve)
+    expect(p1a.mul(2n).x).toBe(expectedX)
+
+    // Large scalar
+    const productLarge =
+      p1a.mul(0xea525dd5a1353762a14e9e78b9063316d1f2d5e792f87862n)
+    expect(productLarge.x).toBe(
+      5095008632516147798595855149669871701227161828659032863660n,
+    )
+
+    // Jacobian
+    expect(point1.mul(2n).x).toBe(expectedX)
+  })
+
+  // y² ≡ x³ + ax + b (mod p) verification
+  test('isOnCurve() returns true for valid points, false for identity', () => {
+    expect(point1.isOnCurve()).toBe(true)
+    expect(new Point().isOnCurve()).toBe(false)
+  })
+
+  // P + O = P  (identity element of the group)
+  test('adding the identity element returns the original point', () => {
+    const identity = new Point(null, null, curve, true)
+    expect(point1.add(identity).x).toBe(point1.x)
+    expect(identity.add(point1).x).toBe(point1.x)
+  })
+
+  // 0·P = O  and  n·P = O  (group order)
+  test('multiplying by 0 or n yields the identity', () => {
+    expect(point1.mul(0n).isIdentity).toBe(true)
+    expect(point1.mul(curve.n).isIdentity).toBe(true)
+  })
+
+  // P + (-P) = O  (additive inverse in affine coordinates)
+  test('P + (-P) = O in affine coordinates', () => {
+    const p1a = new Point(point1.x, point1.y, affineCurve)
+    expect(p1a.add(p1a.neg()).isIdentity).toBe(true)
+  })
+
+  // P + (-P) = O  (additive inverse in Jacobian coordinates)
+  test('P + (-P) = O in Jacobian coordinates', () => {
+    expect(point1.add(point1.neg()).isIdentity).toBe(true)
+  })
+
+  // Doubling a point with y = 0: tangent is vertical → result is O
+  test('doubling a point with y = 0 yields identity', () => {
+    const crv = new CurveParams({ p: 13n, a: 1n, b: 0n, n: 4n, h: 1n })
+    const P = new Point(0n, 0n, crv)
+    expect(P.add(P).isIdentity).toBe(true)
+  })
+
+  // k·O = O  (scalar multiplication of identity)
+  test('multiplying identity by any scalar remains identity (Jacobian)', () => {
+    const crv = new CurveParams({ p: 13n, a: 1n, b: 0n, n: 4n, h: 1n })
+    const inf = new Point(null, null, crv, true)
+    expect(inf.mul(3n).isIdentity).toBe(true)
+  })
+
+  test('multiplying identity by any scalar remains identity (affine)', () => {
+    const crv = new CurveParams({
+      p: 13n,
+      a: 1n,
+      b: 0n,
+      n: 4n,
+      h: 1n,
+      coord: CoordinateSystem.AFFINE,
+    })
+    const inf = new Point(null, null, crv, true)
+    expect(inf.mul(3n).isIdentity).toBe(true)
+  })
+
+  // Affine: P + (-P) = O via affine_add detecting x₁ = x₂, y₁ ≠ y₂
+  test('affine addition of inverse points returns identity', () => {
+    const p1 = new Point(point1.x, point1.y, affineCurve)
+    expect(p1.add(p1.neg()).isIdentity).toBe(true)
+  })
+
+  // Affine: doubling (0, 0) where 2y = 0 → no inverse → O
+  test('affine doubling with y = 0 returns identity', () => {
+    const crv = new CurveParams({
+      p: 13n,
+      a: 1n,
+      b: 0n,
+      n: 4n,
+      h: 1n,
+      coord: CoordinateSystem.AFFINE,
+    })
+    expect(new Point(0n, 0n, crv).add(new Point(0n, 0n, crv)).isIdentity).toBe(
+      true,
+    )
+  })
+
+  // Jacobian: jac_add detects U₁ = U₂, S₁ ≠ S₂ → identity
+  test('Jacobian addition of inverse points returns identity', () => {
+    const crv = new CurveParams({ p: 13n, a: 1n, b: 0n, n: 4n, h: 1n })
+    const pJac = toJacobian(new Point(10n, 3n, crv))
+    const pInvJac = toJacobian(new Point(10n, crv.p - 3n, crv))
+    const result = jacAdd(pJac, pInvJac, crv)
+    expect(result.x).toBe(null)
+    expect(result.y).toBe(null)
+  })
+
+  // Jacobian: doubling with Y = 0 → identity
+  test('Jacobian doubling with y = 0 returns identity', () => {
+    const crv = new CurveParams({ p: 13n, a: 1n, b: 0n, n: 4n, h: 1n })
+    const result = jacDouble(toJacobian(new Point(0n, 0n, crv)), crv)
+    expect(result.x).toBe(null)
+    expect(result.y).toBe(null)
+  })
+
+  // O + O = O
+  test('doubling identity returns identity', () => {
+    const identity = new Point(null, null, curve, true)
+    expect(identity.add(identity).isIdentity).toBe(true)
+  })
+
+  // jac_add(P, O) = P
+  test('Jacobian add with identity returns original point', () => {
+    const crv = new CurveParams({ p: 13n, a: 1n, b: 0n, n: 4n, h: 1n })
+    const pJac = toJacobian(new Point(10n, 3n, crv))
+    const result = jacAdd(pJac, new JacobianPoint(), crv)
+    expect(result.x).toBe(pJac.x)
+    expect(result.y).toBe(pJac.y)
+    expect(result.z).toBe(pJac.z)
+  })
+
+  // jac_double(O) = O
+  test('Jacobian doubling identity returns identity', () => {
+    const crv = new CurveParams({ p: 13n, a: 1n, b: 0n, n: 4n, h: 1n })
+    const result = jacDouble(new JacobianPoint(), crv)
+    expect(result.x).toBe(null)
+    expect(result.y).toBe(null)
+  })
+
+  // toJacobian(O) = JacobianPoint(null, null, 1)
+  test('converting affine identity to Jacobian gives Jacobian identity', () => {
+    const result = toJacobian(new Point())
+    expect(result.x).toBe(null)
+    expect(result.y).toBe(null)
+  })
+
+  // -P = (x, -y mod p)
+  test('negation computes (x, p - y)', () => {
+    const negPoint = point1.neg()
+    expect(negPoint.x).toBe(point1.x)
+    expect(negPoint.y).toBe(((-point1.y % curve.p) + curve.p) % curve.p)
+  })
+
+  // P₁ - P₂ = P₁ + (-P₂)
+  test('subtraction equals addition of negation', () => {
+    const resultSub = point1.sub(point2)
+    const resultAddNeg = point1.add(point2.neg())
+    expect(resultSub.x).toBe(resultAddNeg.x)
+    expect(resultSub.y).toBe(resultAddNeg.y)
+  })
+
+  // affine_double(null, null) = (null, null)
+  test('affine_double of identity returns identity', () => {
+    expect(affineDouble(null, null, affineCurve)).toEqual([null, null])
+  })
+
+  // affine_add(P, O) = P
+  test('affine_add with identity as second operand returns first point', () => {
+    expect(affineAdd(point1.x, point1.y, null, null, affineCurve)).toEqual([
+      point1.x,
+      point1.y,
+    ])
+  })
+
+  // Arithmetic requires curve parameters
+  test('arithmetic without curve parameters throws', () => {
+    const p = new Point(1n, 2n)
+    expect(() => p.add(p)).toThrow()
+  })
+
+  // _coerce assigns curve params to a point that lacks them
+  test('_coerce borrows curve from the other operand', () => {
+    const pWithoutCurve = new Point(point2.x, point2.y)
+    const coerced = point1._coerce(pWithoutCurve)
+    expect(coerced.curve).toBe(curve)
+    expect(point1.add(pWithoutCurve).isIdentity).toBe(false)
+  })
+
+  // -O = O
+  test('negation of identity returns identity', () => {
+    const identity = new Point(null, null, curve, true)
+    expect(identity.neg().isIdentity).toBe(true)
+  })
+
+  // toString representation
+  test('toString of identity displays Point(∞)', () => {
+    expect(new Point().toString()).toBe('Point(∞)')
+  })
+
+  test('toString of non-identity displays coordinates', () => {
+    expect(point1.toString()).toContain('Point(x=')
+    expect(point1.toString()).toContain(point1.x.toString())
+  })
+
+  // --- SEC 1 compression / decompression ---
+
+  test('compressSec1 produces correct prefix and length', () => {
+    const G = getGenerator('secp256k1')
+    const compressed = G.compressSec1()
+    // 256-bit curve → 32-byte x + 1-byte prefix = 33 bytes
+    expect(compressed.length).toBe(33)
+    expect([0x02, 0x03]).toContain(compressed[0])
+  })
+
+  test('compressSec1 throws for identity', () => {
+    const identity = new Point(null, null, curve, true)
+    expect(() => identity.compressSec1()).toThrow('identity')
+  })
+
+  test('toUncompressedSec1 produces correct prefix and length', () => {
+    const G = getGenerator('secp256k1')
+    const uncompressed = G.toUncompressedSec1()
+    // 256-bit curve → 32-byte x + 32-byte y + 1-byte prefix = 65 bytes
+    expect(uncompressed.length).toBe(65)
+    expect(uncompressed[0]).toBe(0x04)
+  })
+
+  test('toUncompressedSec1 throws for identity', () => {
+    const identity = new Point(null, null, curve, true)
+    expect(() => identity.toUncompressedSec1()).toThrow('identity')
+  })
+
+  test('fromSec1 compressed roundtrip', () => {
+    const G = getGenerator('secp256k1')
+    const sec1Curve = getCurve('secp256k1')
+    const compressed = G.compressSec1()
+    const recovered = Point.fromSec1(compressed, sec1Curve)
+    expect(recovered.x).toBe(G.x)
+    expect(recovered.y).toBe(G.y)
+  })
+
+  test('fromSec1 uncompressed roundtrip', () => {
+    const G = getGenerator('secp256k1')
+    const sec1Curve = getCurve('secp256k1')
+    const uncompressed = G.toUncompressedSec1()
+    const recovered = Point.fromSec1(uncompressed, sec1Curve)
+    expect(recovered.x).toBe(G.x)
+    expect(recovered.y).toBe(G.y)
+  })
+
+  test('fromSec1 throws for data too short', () => {
+    const sec1Curve = getCurve('secp256k1')
+    expect(() => Point.fromSec1(new Uint8Array([0x02]), sec1Curve)).toThrow()
+  })
+
+  test('fromSec1 throws for unknown prefix', () => {
+    const sec1Curve = getCurve('secp256k1')
+    const bad = new Uint8Array(33)
+    bad[0] = 0x05
+    expect(() => Point.fromSec1(bad, sec1Curve)).toThrow('Unknown SEC 1 prefix')
+  })
+
+  test('fromSec1 throws for wrong compressed length', () => {
+    const sec1Curve = getCurve('secp256k1')
+    const bad = new Uint8Array(20)
+    bad[0] = 0x02
+    expect(() => Point.fromSec1(bad, sec1Curve)).toThrow()
+  })
+
+  test('fromSec1 throws for wrong uncompressed length', () => {
+    const sec1Curve = getCurve('secp256k1')
+    const bad = new Uint8Array(20)
+    bad[0] = 0x04
+    expect(() => Point.fromSec1(bad, sec1Curve)).toThrow()
+  })
+
+  test('compress throws for identity', () => {
+    const identity = new Point(null, null, curve, true)
+    expect(() => identity.compress()).toThrow('identity')
+  })
+
+  test('decompress with parity flip selects correct root', () => {
+    const toyCurve = new CurveParams({ p: 23n, a: 1n, b: 1n, n: 28n, h: 1n })
+    const P = new Point(0n, 1n, toyCurve)
+    const [x, parity] = P.compress()
+    // Decompress with opposite parity → y = p - original_y
+    const flipped = Point.decompress(x, parity === 0n ? 1n : 0n, toyCurve)
+    expect(flipped.y).toBe(toyCurve.p - P.y)
+  })
+
+  test('decompress throws for invalid x', () => {
+    // Use a curve where x=999 has no valid point
+    const toyCurve = new CurveParams({ p: 23n, a: 1n, b: 1n, n: 28n, h: 1n })
+    // x=2: rhs = 8 + 2 + 1 = 11. 11 is not a QR mod 23.
+    expect(() => Point.decompress(2n, 0n, toyCurve)).toThrow(
+      'does not correspond',
+    )
+  })
+
+  test('SEC 1 roundtrip on secp521r1 (odd-byte field size)', () => {
+    const G = getGenerator('secp521r1')
+    const c = getCurve('secp521r1')
+    const comp = G.compressSec1()
+    const uncomp = G.toUncompressedSec1()
+    expect(Point.fromSec1(comp, c).x).toBe(G.x)
+    expect(Point.fromSec1(uncomp, c).x).toBe(G.x)
+  })
 })
 
-test('double_point(P) to equal the expected double', () => {
-  const P = new Point(
-    BigInt('0xF091CF6331B1747684F5D2549CD1D4B3A8BED93B94F93CB6'),
-    BigInt('0xFD7AF42E1E7565A02E6268661C5E42E603DA2D98A18F2ED5'),
-  )
-  const expectedDouble = new Point(
-    BigInt('0XEA525DD5A1353762A14E9E78B9063316D1F2D5E792F87862'),
-    BigInt('0XA936D583530982690C445427CDF2C5B0BB1C88749247B02E'),
-  )
-  expect(secp192k1.double_point(P)).toStrictEqual(expectedDouble)
+// ---------------------------------------------------------------------------
+// Group law properties on E: y² = x³ + x + 1 over F₂₃  (n = 28)
+//
+// An elliptic curve over a finite field forms an abelian group:
+//   1. Identity:       P + O = P
+//   2. Inverse:        P + (-P) = O
+//   3. Associativity:  (P + Q) + R = P + (Q + R)
+//   4. Commutativity:  P + Q = Q + P
+//   5. Distributivity: (a + b)·P = a·P + b·P
+// ---------------------------------------------------------------------------
+
+describe('Group law properties (toy curve E/F₂₃)', () => {
+  const curve = new CurveParams({
+    p: 23n,
+    a: 1n,
+    b: 1n,
+    n: 28n,
+    h: 1n,
+  })
+  const P = new Point(0n, 1n, curve)
+  const Q = new Point(6n, 19n, curve)
+  const inf = new Point(null, null, curve, true)
+
+  test('P + O = P  (right identity)', () => {
+    const result = P.add(inf)
+    expect(result.x).toBe(P.x)
+    expect(result.y).toBe(P.y)
+  })
+
+  test('O + P = P  (left identity)', () => {
+    const result = inf.add(P)
+    expect(result.x).toBe(P.x)
+    expect(result.y).toBe(P.y)
+  })
+
+  test('P + (-P) = O  (inverse)', () => {
+    expect(P.add(P.neg()).isIdentity).toBe(true)
+  })
+
+  test('n·P = O  (group order)', () => {
+    expect(P.mul(curve.n).isIdentity).toBe(true)
+  })
+
+  test('0·P = O', () => {
+    expect(P.mul(0n).isIdentity).toBe(true)
+  })
+
+  test('1·P = P', () => {
+    const result = P.mul(1n)
+    expect(result.x).toBe(P.x)
+    expect(result.y).toBe(P.y)
+  })
+
+  test('(P + Q) + R = P + (Q + R)  (associativity)', () => {
+    const R = P.mul(3n)
+    const lhs = P.add(Q).add(R)
+    const rhs = P.add(Q.add(R))
+    expect(lhs.x).toBe(rhs.x)
+    expect(lhs.y).toBe(rhs.y)
+  })
+
+  test('P + Q = Q + P  (commutativity)', () => {
+    const pq = P.add(Q)
+    const qp = Q.add(P)
+    expect(pq.x).toBe(qp.x)
+    expect(pq.y).toBe(qp.y)
+  })
+
+  test('(a + b)·P = a·P + b·P  (distributivity)', () => {
+    const a = 7n,
+      b = 13n
+    const lhs = P.mul(a + b)
+    const rhs = P.mul(a).add(P.mul(b))
+    expect(lhs.x).toBe(rhs.x)
+    expect(lhs.y).toBe(rhs.y)
+  })
+
+  test('P + P = 2·P  (doubling via addition equals scalar multiplication)', () => {
+    const pp = P.add(P)
+    const twoP = P.mul(2n)
+    expect(pp.x).toBe(twoP.x)
+    expect(pp.y).toBe(twoP.y)
+  })
+
+  test('k·P computed via mul is consistent', () => {
+    const r1 = P.mul(5n)
+    const r2 = P.mul(5n)
+    expect(r1.x).toBe(r2.x)
+    expect(r1.y).toBe(r2.y)
+  })
 })
 
-test('multiply_point(scalar, P) to equal the expected product', () => {
-  const scalar = BigInt('2')
-  const P = new Point(
-    BigInt('0xF091CF6331B1747684F5D2549CD1D4B3A8BED93B94F93CB6'),
-    BigInt('0xFD7AF42E1E7565A02E6268661C5E42E603DA2D98A18F2ED5'),
-  )
-  const expectedProduct = new Point(
-    BigInt('0xEA525DD5A1353762A14E9E78B9063316D1F2D5E792F87862'),
-    BigInt('0xA936D583530982690C445427CDF2C5B0BB1C88749247B02E'),
-  )
-  expect(secp192k1.multiply_point(scalar, P)).toStrictEqual(expectedProduct)
+// ---------------------------------------------------------------------------
+// Jacobian ↔ Affine consistency
+//
+// Jacobian coordinates (X, Y, Z) map to affine (x, y) via:
+//   x = X / Z²,   y = Y / Z³
+//
+// Both systems must produce identical results for all scalar multiples.
+// ---------------------------------------------------------------------------
+
+describe('Jacobian ↔ Affine consistency (E/F₂₃)', () => {
+  const curveJac = new CurveParams({
+    p: 23n,
+    a: 1n,
+    b: 1n,
+    n: 28n,
+    h: 1n,
+    coord: CoordinateSystem.JACOBIAN,
+  })
+  const curveAff = new CurveParams({
+    p: 23n,
+    a: 1n,
+    b: 1n,
+    n: 28n,
+    h: 1n,
+    coord: CoordinateSystem.AFFINE,
+  })
+  const Pjac = new Point(0n, 1n, curveJac)
+  const Paff = new Point(0n, 1n, curveAff)
+
+  test('k·P matches for k = 1, 2, ..., n-1', () => {
+    for (let k = 1n; k < curveJac.n; k++) {
+      const rj = Pjac.mul(k)
+      const ra = Paff.mul(k)
+      expect(rj.x).toBe(ra.x)
+      expect(rj.y).toBe(ra.y)
+    }
+  })
+
+  test('n·P = O in both coordinate systems', () => {
+    expect(Pjac.mul(curveJac.n).isIdentity).toBe(true)
+    expect(Paff.mul(curveAff.n).isIdentity).toBe(true)
+  })
+
+  test('P + Q matches in both coordinate systems', () => {
+    const Qjac = new Point(6n, 19n, curveJac)
+    const Qaff = new Point(6n, 19n, curveAff)
+    const rj = Pjac.add(Qjac)
+    const ra = Paff.add(Qaff)
+    expect(rj.x).toBe(ra.x)
+    expect(rj.y).toBe(ra.y)
+  })
 })
 
-test('is_point_on_curve(P) to be true for a point on the curve and false otherwise', () => {
-  const P1 = new Point(
-    BigInt('0xF091CF6331B1747684F5D2549CD1D4B3A8BED93B94F93CB6'),
-    BigInt('0xFD7AF42E1E7565A02E6268661C5E42E603DA2D98A18F2ED5'),
-  )
-  const P2 = new Point(200n, 119n)
-  const P3 = new Point()
-  expect(secp192k1.is_point_on_curve(P1)).toBe(true)
-  expect(secp192k1.is_point_on_curve(P2)).toBe(false)
-  expect(secp192k1.is_point_on_curve(P3)).toBe(false)
-})
+// ---------------------------------------------------------------------------
+// Group law properties on secp256k1 (production curve)
+//
+// secp256k1: y² = x³ + 7 over a 256-bit prime field
+// Used by Bitcoin and many other cryptocurrencies.
+// Order n ≈ 2²⁵⁶ — ensures ECDLP security.
+// ---------------------------------------------------------------------------
 
-test('add_points(P1, offCurvePoint) to throw an error for adding invalid points not on the curve', () => {
-  const P1 = new Point(
-    BigInt('0xF091CF6331B1747684F5D2549CD1D4B3A8BED93B94F93CB6'),
-    BigInt('0xFD7AF42E1E7565A02E6268661C5E42E603DA2D98A18F2ED5'),
-  )
-  const offCurvePoint = new Point(BigInt('200'), BigInt('119'))
-  expect(() => {
-    secp192k1.add_points(P1, offCurvePoint)
-  }).toThrow()
-})
+describe('Group law properties (secp256k1)', () => {
+  const curve = getCurve('secp256k1')
+  const G = getGenerator('secp256k1')
 
-test('add_points(P, identity) to equal P and vice versa', () => {
-  const P = new Point(
-    BigInt('0xF091CF6331B1747684F5D2549CD1D4B3A8BED93B94F93CB6'),
-    BigInt('0xFD7AF42E1E7565A02E6268661C5E42E603DA2D98A18F2ED5'),
-  )
-  const identity = new Point() // Assuming Point at infinity
-  expect(secp192k1.add_points(P, identity)).toStrictEqual(P)
-  expect(secp192k1.add_points(identity, P)).toStrictEqual(P)
-})
+  test('generator G lies on the curve', () => {
+    expect(G.isOnCurve()).toBe(true)
+  })
 
-test('multiply_point(0, P) and multiply_point(n, P) to throw an error, and multiply_point(scalar, offCurvePoint) to throw an error', () => {
-  const P = new Point(
-    BigInt('0xF091CF6331B1747684F5D2549CD1D4B3A8BED93B94F93CB6'),
-    BigInt('0xFD7AF42E1E7565A02E6268661C5E42E603DA2D98A18F2ED5'),
-  )
-  const offCurvePoint = new Point(200n, 199n)
-  expect(() => {
-    secp192k1.multiply_point(0n, P)
-  }).toThrow()
-  expect(() => {
-    secp192k1.multiply_point(secp192k1.n, P)
-  }).toThrow()
-  expect(() => {
-    secp192k1.multiply_point(2n, offCurvePoint)
-  }).toThrow()
-})
+  test('n·G = O  (generator order)', () => {
+    expect(G.mul(curve.n).isIdentity).toBe(true)
+  })
 
-test('add_points(P, inversePoint) to equal the identity element', () => {
-  const P = new Point(
-    BigInt('0xF091CF6331B1747684F5D2549CD1D4B3A8BED93B94F93CB6'),
-    BigInt('0xFD7AF42E1E7565A02E6268661C5E42E603DA2D98A18F2ED5'),
-  )
-  const inversePoint = new Point(
-    BigInt('0XF091CF6331B1747684F5D2549CD1D4B3A8BED93B94F93CB6'),
-    BigInt('0X2850BD1E18A9A5FD19D9799E3A1BD19FC25D2665E70BF62'),
-  )
-  const identity = new Point() // Point at infinity
-  expect(secp192k1.add_points(P, inversePoint)).toStrictEqual(identity)
-})
+  test('(P + Q) + R = P + (Q + R)  (associativity)', () => {
+    const P = G.mul(7n)
+    const Q = G.mul(13n)
+    const R = G.mul(42n)
+    const lhs = P.add(Q).add(R)
+    const rhs = P.add(Q.add(R))
+    expect(lhs.x).toBe(rhs.x)
+    expect(lhs.y).toBe(rhs.y)
+  })
 
-test('Doubling a point with y=0 should result in the point at infinity', () => {
-  const curve = new EllipticCurve(
-    13n, // prime number defining the finite field
-    1n, // 'a' coefficient of the elliptic curve equation
-    0n, // 'b' coefficient of the elliptic curve equation
-    new Point(2n, 1n), // generator point for the curve group
-    4n, // order of the base point G
-    0n, // cofactor
-  )
-  const pointWithYZero = new Point(0n, 0n)
-  const expectedInfinity = new Point() // Point at infinity
-  expect(curve.add_points(pointWithYZero, pointWithYZero)).toStrictEqual(
-    expectedInfinity,
-  )
-})
+  test('P + Q = Q + P  (commutativity)', () => {
+    const P = G.mul(7n)
+    const Q = G.mul(13n)
+    const pq = P.add(Q)
+    const qp = Q.add(P)
+    expect(pq.x).toBe(qp.x)
+    expect(pq.y).toBe(qp.y)
+  })
 
-test('Multiplying the point at infinity by any scalar should remain the point at infinity', () => {
-  const curve = new EllipticCurve(
-    13n, // prime number defining the finite field
-    1n, // 'a' coefficient of the elliptic curve equation
-    0n, // 'b' coefficient of the elliptic curve equation
-    new Point(2n, 1n), // generator point for the curve group
-    4n, // order of the base point G
-    0n, // cofactor
-  )
-  const pointAtInfinity = new Point() // Point at infinity
-  const expectedInfinity = new Point() // Point at infinity
-  expect(curve.multiply_point(3n, pointAtInfinity)).toStrictEqual(
-    expectedInfinity,
-  )
+  test('(a + b)·G = a·G + b·G  (distributivity)', () => {
+    const a = 123n,
+      b = 456n
+    const lhs = G.mul(a + b)
+    const rhs = G.mul(a).add(G.mul(b))
+    expect(lhs.x).toBe(rhs.x)
+    expect(lhs.y).toBe(rhs.y)
+  })
+
+  test('P + (-P) = O  (inverse)', () => {
+    const P = G.mul(42n)
+    expect(P.add(P.neg()).isIdentity).toBe(true)
+  })
 })

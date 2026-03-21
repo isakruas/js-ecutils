@@ -1,85 +1,109 @@
-import { test, expect } from '@jest/globals'
-import { DiffieHellman, MasseyOmura } from './protocols'
-import { Koblitz } from './algorithms'
-import { Point } from './core'
+import { test, expect, describe } from '@jest/globals'
+import { DiffieHellman } from './protocols/diffie_hellman'
+import { MasseyOmura } from './protocols/massey_omura'
+import { Koblitz } from './algorithms/koblitz'
+import { getGenerator } from './curves/registry'
 
-test('diffie-hellman: compute shared secret', () => {
-  const private_key_alice = 12345n
-  const dh_alice = new DiffieHellman(private_key_alice)
-  const private_key_bob = 67890n
-  const dh_bob = new DiffieHellman(private_key_bob)
+// ---------------------------------------------------------------------------
+// Elliptic Curve Diffie-Hellman (ECDH)
+//
+// Protocol:
+//   1. Alice:  H_A = d_A · G
+//   2. Bob:    H_B = d_B · G
+//   3. Shared secret:  S = d_A · H_B = d_B · H_A = d_A · d_B · G
+//
+// Security: relies on the Elliptic Curve Discrete Logarithm Problem (ECDLP).
+// Given G and Q = d·G, recovering d is computationally infeasible.
+// ---------------------------------------------------------------------------
 
-  // Alice computes the shared secret using Bob's public key
-  const secret_alice = dh_alice.compute_shared_secret(dh_bob.public_key)
+describe('Diffie-Hellman key exchange', () => {
+  test('both parties compute the same shared secret', () => {
+    const alice = new DiffieHellman(12345n)
+    const bob = new DiffieHellman(67890n)
 
-  // Bob computes the shared secret using Alice's public key
-  const secret_bob = dh_bob.compute_shared_secret(dh_alice.public_key)
+    // S_A = d_A · H_B = d_A · d_B · G
+    const secretAlice = alice.computeSharedSecret(bob.publicKey)
+    // S_B = d_B · H_A = d_B · d_A · G
+    const secretBob = bob.computeSharedSecret(alice.publicKey)
 
-  // The secrets should match
-  expect(secret_alice).toStrictEqual(secret_bob)
+    expect(secretAlice.x).toBe(secretBob.x)
+    expect(secretAlice.y).toBe(secretBob.y)
+  })
+
+  test('default curve is secp256k1', () => {
+    expect(new DiffieHellman(1n).curveName).toBe('secp256k1')
+  })
+
+  // H = d·G must satisfy y² ≡ x³ + ax + b (mod p)
+  test('public key lies on the curve', () => {
+    expect(new DiffieHellman(42n).publicKey.isOnCurve()).toBe(true)
+  })
 })
 
-test('massey-omura: encryption decryption', () => {
-  // Initialize the Koblitz instance for the elliptic curve 'secp192k1'
-  const koblitz = new Koblitz('secp192k1')
+// ---------------------------------------------------------------------------
+// Massey-Omura three-pass protocol
+//
+// Allows two parties to exchange a secret point M without sharing keys
+// beforehand.  Each party uses only their own private key.
+//
+// Three-pass flow:
+//   1. Alice encrypts:   C₁ = e_A · M
+//   2. Bob encrypts:     C₂ = e_B · C₁
+//   3. Alice decrypts:   C₃ = e_A⁻¹ · C₂
+//   4. Bob decrypts:     M  = e_B⁻¹ · C₃
+//
+// Works because scalar multiplication is commutative:
+//   e_A · (e_B · M) = e_B · (e_A · M)
+//
+// Requirement: gcd(private_key, n) = 1  (so that e⁻¹ mod n exists)
+// ---------------------------------------------------------------------------
 
-  // Sender's side
-  // -------------
-  const privateKeySender = BigInt('70604135')
-  // Initialize Massey-Omura protocol with the sender's private key
-  const moSender = new MasseyOmura(privateKeySender)
+describe('Massey-Omura three-pass protocol', () => {
+  test('complete encryption/decryption cycle recovers original message', () => {
+    const sender = new MasseyOmura(123456n)
+    const receiver = new MasseyOmura(654321n)
 
-  // Encode the message using the Koblitz method
-  // `j` is used to handle the ambiguity in the decoding process
-  const [message, j] = koblitz.encode('Hello, world!')
+    const message = getGenerator(sender.curveName)
 
-  // Perform the first encryption step with Massey-Omura protocol
-  const encryptedMsgSender = moSender.first_encryption_step(message)
+    // C₁ = e_sender · M
+    const c1 = sender.encrypt(message)
+    // C₂ = e_receiver · C₁
+    const c2 = receiver.encrypt(c1)
+    // C₃ = e_sender⁻¹ · C₂  (removes sender's encryption)
+    const c3 = sender.decrypt(c2)
+    // M  = e_receiver⁻¹ · C₃  (removes receiver's encryption)
+    const recovered = receiver.decrypt(c3)
 
-  // The encoded message is now sent to the receiver...
-  // (transmission of encryptedMsgSender)
+    expect(recovered.x).toBe(message.x)
+    expect(recovered.y).toBe(message.y)
+  })
 
-  // Receiver's side
-  // ---------------
-  const privateKeyReceiver = BigInt('48239108668')
-  // Initialize Massey-Omura protocol with the receiver's private key
-  const moReceiver = new MasseyOmura(privateKeyReceiver)
+  // d·G must lie on the curve
+  test('point multiplication with private key produces on-curve point', () => {
+    const mo = new MasseyOmura(123456n)
+    const G = getGenerator(mo.curveName)
+    expect(G.mul(123456n).isOnCurve()).toBe(true)
+  })
 
-  // Perform the second encryption step with Massey-Omura protocol
-  const encryptedMsgReceiver =
-    moReceiver.second_encryption_step(encryptedMsgSender)
+  test('default curve is secp521r1', () => {
+    expect(new MasseyOmura(1n).curveName).toBe('secp521r1')
+  })
 
-  // The double-encrypted message is sent back to the sender...
-  // (transmission of encryptedMsgReceiver)
+  // Full end-to-end with Koblitz encoding
+  test('three-pass exchange with Koblitz-encoded message', () => {
+    const koblitz = new Koblitz('secp521r1')
+    const [message, j] = koblitz.encode('Hello!')
 
-  // Sender's side again
-  // -------------------
-  const partialDecryptedMsg =
-    moSender.partial_decryption_step(encryptedMsgReceiver)
+    const alice = new MasseyOmura(0xa1n, 'secp521r1')
+    const bob = new MasseyOmura(0xb2n, 'secp521r1')
 
-  // The partially decrypted message is sent back to the receiver...
-  // (transmission of partialDecryptedMsg)
+    const c1 = alice.encrypt(message)
+    const c2 = bob.encrypt(c1)
+    const c3 = alice.decrypt(c2)
+    const plaintext = bob.decrypt(c3)
 
-  // Receiver's final decryption
-  // ---------------------------
-  const originalMessage =
-    moReceiver.partial_decryption_step(partialDecryptedMsg)
-
-  // Decode the message using the Koblitz method
-  // `j` is used to resolve the mapping from the elliptic curve point back to the message
-  const decodedMessage = koblitz.decode(originalMessage, j)
-
-  // The fully decrypted message should match the original message
-  expect(decodedMessage).toStrictEqual('Hello, world!')
-})
-
-test('massey-omura: validate the public key value', () => {
-  const moSender = new MasseyOmura(654564n)
-
-  const P1 = new Point(
-    2561645154652864168258282342383115659685709191094067233983n,
-    89709827696035605786509950363037856155865475850237621433n,
-  )
-
-  expect(moSender.public_key.toString()).toStrictEqual(P1.toString())
+    expect(plaintext.x).toBe(message.x)
+    expect(plaintext.y).toBe(message.y)
+    expect(koblitz.decode(plaintext, j)).toBe('Hello!')
+  })
 })
