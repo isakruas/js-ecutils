@@ -48,12 +48,12 @@ describe('Elliptic curve operations', () => {
   const point1 = new Point(
     0xf091cf6331b1747684f5d2549cd1d4b3a8bed93b94f93cb6n,
     0xfd7af42e1e7565a02e6268661c5e42e603da2d98a18f2ed5n,
-    curve
+    curve,
   )
   const point2 = new Point(
     0x6e43b7dcae2fd5e0bf2a1ba7615ca3b9065487c9a67b4583n,
     0xc48dcea47ae08e84d5fedc3d09e4c19606a290f7a19a6a58n,
-    curve
+    curve,
   )
 
   test('affine arithmetic: addition, doubling, and scalar multiplication', () => {
@@ -74,7 +74,7 @@ describe('Elliptic curve operations', () => {
     expectedProduct = new Point(
       expectedProduct.x,
       expectedProduct.y,
-      affineCurve
+      affineCurve,
     )
     expectedProduct = expectedProduct.add(p1)
     const calculatedProduct = p1.mul(3n)
@@ -84,10 +84,8 @@ describe('Elliptic curve operations', () => {
 
   // P₁ + P₂ on secp192k1 — verified against known test vectors
   test('point addition produces expected result in both coordinate systems', () => {
-    const expectedSumX =
-      0x3cd61e370d02ca0687c0b5f7ebf6d0373f4dd0ccccb7cc2dn
-    const expectedSumY =
-      0x2c4befd9b02f301eb4014504f0533aa7eb19e9ea56441f78n
+    const expectedSumX = 0x3cd61e370d02ca0687c0b5f7ebf6d0373f4dd0ccccb7cc2dn
+    const expectedSumY = 0x2c4befd9b02f301eb4014504f0533aa7eb19e9ea56441f78n
 
     // Affine: λ = (y₂-y₁)·(x₂-x₁)⁻¹, x₃ = λ²-x₁-x₂, y₃ = λ(x₁-x₃)-y₁
     const p1a = new Point(point1.x, point1.y, affineCurve)
@@ -104,10 +102,8 @@ describe('Elliptic curve operations', () => {
 
   // 2·P₁ — point doubling verified against known test vectors
   test('point doubling produces expected result in both coordinate systems', () => {
-    const expectedDoubleX =
-      0xea525dd5a1353762a14e9e78b9063316d1f2d5e792f87862n
-    const expectedDoubleY =
-      0xa936d583530982690c445427cdf2c5b0bb1c88749247b02en
+    const expectedDoubleX = 0xea525dd5a1353762a14e9e78b9063316d1f2d5e792f87862n
+    const expectedDoubleY = 0xa936d583530982690c445427cdf2c5b0bb1c88749247b02en
 
     // Affine: λ = (3x₁²+a)·(2y₁)⁻¹
     const p1a = new Point(point1.x, point1.y, affineCurve)
@@ -128,19 +124,17 @@ describe('Elliptic curve operations', () => {
 
   // k·P via double-and-add: 2·P₁ should equal the known doubled value
   test('scalar multiplication with known vectors', () => {
-    const expectedX =
-      0xea525dd5a1353762a14e9e78b9063316d1f2d5e792f87862n
+    const expectedX = 0xea525dd5a1353762a14e9e78b9063316d1f2d5e792f87862n
 
     // Affine
     const p1a = new Point(point1.x, point1.y, affineCurve)
     expect(p1a.mul(2n).x).toBe(expectedX)
 
     // Large scalar
-    const productLarge = p1a.mul(
-      0xea525dd5a1353762a14e9e78b9063316d1f2d5e792f87862n
-    )
+    const productLarge =
+      p1a.mul(0xea525dd5a1353762a14e9e78b9063316d1f2d5e792f87862n)
     expect(productLarge.x).toBe(
-      5095008632516147798595855149669871701227161828659032863660n
+      5095008632516147798595855149669871701227161828659032863660n,
     )
 
     // Jacobian
@@ -193,7 +187,11 @@ describe('Elliptic curve operations', () => {
 
   test('multiplying identity by any scalar remains identity (affine)', () => {
     const crv = new CurveParams({
-      p: 13n, a: 1n, b: 0n, n: 4n, h: 1n,
+      p: 13n,
+      a: 1n,
+      b: 0n,
+      n: 4n,
+      h: 1n,
       coord: CoordinateSystem.AFFINE,
     })
     const inf = new Point(null, null, crv, true)
@@ -209,10 +207,16 @@ describe('Elliptic curve operations', () => {
   // Affine: doubling (0, 0) where 2y = 0 → no inverse → O
   test('affine doubling with y = 0 returns identity', () => {
     const crv = new CurveParams({
-      p: 13n, a: 1n, b: 0n, n: 4n, h: 1n,
+      p: 13n,
+      a: 1n,
+      b: 0n,
+      n: 4n,
+      h: 1n,
       coord: CoordinateSystem.AFFINE,
     })
-    expect(new Point(0n, 0n, crv).add(new Point(0n, 0n, crv)).isIdentity).toBe(true)
+    expect(new Point(0n, 0n, crv).add(new Point(0n, 0n, crv)).isIdentity).toBe(
+      true,
+    )
   })
 
   // Jacobian: jac_add detects U₁ = U₂, S₁ ≠ S₂ → identity
@@ -268,7 +272,7 @@ describe('Elliptic curve operations', () => {
   test('negation computes (x, p - y)', () => {
     const negPoint = point1.neg()
     expect(negPoint.x).toBe(point1.x)
-    expect(negPoint.y).toBe((-point1.y % curve.p + curve.p) % curve.p)
+    expect(negPoint.y).toBe(((-point1.y % curve.p) + curve.p) % curve.p)
   })
 
   // P₁ - P₂ = P₁ + (-P₂)
@@ -286,8 +290,10 @@ describe('Elliptic curve operations', () => {
 
   // affine_add(P, O) = P
   test('affine_add with identity as second operand returns first point', () => {
-    expect(affineAdd(point1.x, point1.y, null, null, affineCurve))
-      .toEqual([point1.x, point1.y])
+    expect(affineAdd(point1.x, point1.y, null, null, affineCurve)).toEqual([
+      point1.x,
+      point1.y,
+    ])
   })
 
   // Arithmetic requires curve parameters
@@ -314,6 +320,115 @@ describe('Elliptic curve operations', () => {
   test('toString of identity displays Point(∞)', () => {
     expect(new Point().toString()).toBe('Point(∞)')
   })
+
+  test('toString of non-identity displays coordinates', () => {
+    expect(point1.toString()).toContain('Point(x=')
+    expect(point1.toString()).toContain(point1.x.toString())
+  })
+
+  // --- SEC 1 compression / decompression ---
+
+  test('compressSec1 produces correct prefix and length', () => {
+    const G = getGenerator('secp256k1')
+    const compressed = G.compressSec1()
+    // 256-bit curve → 32-byte x + 1-byte prefix = 33 bytes
+    expect(compressed.length).toBe(33)
+    expect([0x02, 0x03]).toContain(compressed[0])
+  })
+
+  test('compressSec1 throws for identity', () => {
+    const identity = new Point(null, null, curve, true)
+    expect(() => identity.compressSec1()).toThrow('identity')
+  })
+
+  test('toUncompressedSec1 produces correct prefix and length', () => {
+    const G = getGenerator('secp256k1')
+    const uncompressed = G.toUncompressedSec1()
+    // 256-bit curve → 32-byte x + 32-byte y + 1-byte prefix = 65 bytes
+    expect(uncompressed.length).toBe(65)
+    expect(uncompressed[0]).toBe(0x04)
+  })
+
+  test('toUncompressedSec1 throws for identity', () => {
+    const identity = new Point(null, null, curve, true)
+    expect(() => identity.toUncompressedSec1()).toThrow('identity')
+  })
+
+  test('fromSec1 compressed roundtrip', () => {
+    const G = getGenerator('secp256k1')
+    const sec1Curve = getCurve('secp256k1')
+    const compressed = G.compressSec1()
+    const recovered = Point.fromSec1(compressed, sec1Curve)
+    expect(recovered.x).toBe(G.x)
+    expect(recovered.y).toBe(G.y)
+  })
+
+  test('fromSec1 uncompressed roundtrip', () => {
+    const G = getGenerator('secp256k1')
+    const sec1Curve = getCurve('secp256k1')
+    const uncompressed = G.toUncompressedSec1()
+    const recovered = Point.fromSec1(uncompressed, sec1Curve)
+    expect(recovered.x).toBe(G.x)
+    expect(recovered.y).toBe(G.y)
+  })
+
+  test('fromSec1 throws for data too short', () => {
+    const sec1Curve = getCurve('secp256k1')
+    expect(() => Point.fromSec1(new Uint8Array([0x02]), sec1Curve)).toThrow()
+  })
+
+  test('fromSec1 throws for unknown prefix', () => {
+    const sec1Curve = getCurve('secp256k1')
+    const bad = new Uint8Array(33)
+    bad[0] = 0x05
+    expect(() => Point.fromSec1(bad, sec1Curve)).toThrow('Unknown SEC 1 prefix')
+  })
+
+  test('fromSec1 throws for wrong compressed length', () => {
+    const sec1Curve = getCurve('secp256k1')
+    const bad = new Uint8Array(20)
+    bad[0] = 0x02
+    expect(() => Point.fromSec1(bad, sec1Curve)).toThrow()
+  })
+
+  test('fromSec1 throws for wrong uncompressed length', () => {
+    const sec1Curve = getCurve('secp256k1')
+    const bad = new Uint8Array(20)
+    bad[0] = 0x04
+    expect(() => Point.fromSec1(bad, sec1Curve)).toThrow()
+  })
+
+  test('compress throws for identity', () => {
+    const identity = new Point(null, null, curve, true)
+    expect(() => identity.compress()).toThrow('identity')
+  })
+
+  test('decompress with parity flip selects correct root', () => {
+    const toyCurve = new CurveParams({ p: 23n, a: 1n, b: 1n, n: 28n, h: 1n })
+    const P = new Point(0n, 1n, toyCurve)
+    const [x, parity] = P.compress()
+    // Decompress with opposite parity → y = p - original_y
+    const flipped = Point.decompress(x, parity === 0n ? 1n : 0n, toyCurve)
+    expect(flipped.y).toBe(toyCurve.p - P.y)
+  })
+
+  test('decompress throws for invalid x', () => {
+    // Use a curve where x=999 has no valid point
+    const toyCurve = new CurveParams({ p: 23n, a: 1n, b: 1n, n: 28n, h: 1n })
+    // x=2: rhs = 8 + 2 + 1 = 11. 11 is not a QR mod 23.
+    expect(() => Point.decompress(2n, 0n, toyCurve)).toThrow(
+      'does not correspond',
+    )
+  })
+
+  test('SEC 1 roundtrip on secp521r1 (odd-byte field size)', () => {
+    const G = getGenerator('secp521r1')
+    const c = getCurve('secp521r1')
+    const comp = G.compressSec1()
+    const uncomp = G.toUncompressedSec1()
+    expect(Point.fromSec1(comp, c).x).toBe(G.x)
+    expect(Point.fromSec1(uncomp, c).x).toBe(G.x)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -329,7 +444,11 @@ describe('Elliptic curve operations', () => {
 
 describe('Group law properties (toy curve E/F₂₃)', () => {
   const curve = new CurveParams({
-    p: 23n, a: 1n, b: 1n, n: 28n, h: 1n,
+    p: 23n,
+    a: 1n,
+    b: 1n,
+    n: 28n,
+    h: 1n,
   })
   const P = new Point(0n, 1n, curve)
   const Q = new Point(6n, 19n, curve)
@@ -381,7 +500,8 @@ describe('Group law properties (toy curve E/F₂₃)', () => {
   })
 
   test('(a + b)·P = a·P + b·P  (distributivity)', () => {
-    const a = 7n, b = 13n
+    const a = 7n,
+      b = 13n
     const lhs = P.mul(a + b)
     const rhs = P.mul(a).add(P.mul(b))
     expect(lhs.x).toBe(rhs.x)
@@ -414,11 +534,19 @@ describe('Group law properties (toy curve E/F₂₃)', () => {
 
 describe('Jacobian ↔ Affine consistency (E/F₂₃)', () => {
   const curveJac = new CurveParams({
-    p: 23n, a: 1n, b: 1n, n: 28n, h: 1n,
+    p: 23n,
+    a: 1n,
+    b: 1n,
+    n: 28n,
+    h: 1n,
     coord: CoordinateSystem.JACOBIAN,
   })
   const curveAff = new CurveParams({
-    p: 23n, a: 1n, b: 1n, n: 28n, h: 1n,
+    p: 23n,
+    a: 1n,
+    b: 1n,
+    n: 28n,
+    h: 1n,
     coord: CoordinateSystem.AFFINE,
   })
   const Pjac = new Point(0n, 1n, curveJac)
@@ -488,7 +616,8 @@ describe('Group law properties (secp256k1)', () => {
   })
 
   test('(a + b)·G = a·G + b·G  (distributivity)', () => {
-    const a = 123n, b = 456n
+    const a = 123n,
+      b = 456n
     const lhs = G.mul(a + b)
     const rhs = G.mul(a).add(G.mul(b))
     expect(lhs.x).toBe(rhs.x)

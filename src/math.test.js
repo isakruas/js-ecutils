@@ -3,7 +3,51 @@ import {
   isQuadraticResidue,
   modularSqrt,
   modPow,
+  modulus,
+  modInverse,
+  extendedGcd,
 } from './utils/math'
+
+// ---------------------------------------------------------------------------
+// Modular arithmetic basics
+// ---------------------------------------------------------------------------
+
+describe('Modular arithmetic utilities', () => {
+  test('modulus returns non-negative result for negative dividends', () => {
+    expect(modulus(-5n, 3n)).toBe(1n)
+    expect(modulus(-1n, 7n)).toBe(6n)
+    expect(modulus(5n, 3n)).toBe(2n)
+  })
+
+  test('modPow with m = 1 returns 0', () => {
+    expect(modPow(5n, 3n, 1n)).toBe(0n)
+  })
+
+  test('modPow computes base^exp mod m correctly', () => {
+    // 2^10 = 1024, 1024 mod 100 = 24
+    expect(modPow(2n, 10n, 100n)).toBe(24n)
+    // 3^0 = 1
+    expect(modPow(3n, 0n, 7n)).toBe(1n)
+  })
+
+  test('extendedGcd returns correct Bezout coefficients', () => {
+    const [g, x, y] = extendedGcd(35n, 15n)
+    expect(g).toBe(5n)
+    expect(35n * x + 15n * y).toBe(g)
+  })
+
+  test('modInverse returns correct inverse', () => {
+    // 3 * 5 = 15 ≡ 1 (mod 7)
+    expect(modInverse(3n, 7n)).toBe(5n)
+    // Verify: a * a⁻¹ ≡ 1 (mod p)
+    const inv = modInverse(17n, 23n)
+    expect((17n * inv) % 23n).toBe(1n)
+  })
+
+  test('modInverse throws for non-coprime inputs', () => {
+    expect(() => modInverse(6n, 3n)).toThrow('Modular inverse does not exist')
+  })
+})
 
 // ---------------------------------------------------------------------------
 // Quadratic residue testing — Euler's criterion
@@ -107,5 +151,13 @@ describe('Modular square root', () => {
     const r = modularSqrt(2n, 41n)
     expect(r).not.toBe(null)
     expect(modPow(r, 2n, 41n)).toBe(2n)
+  })
+
+  // √a where a > p (should reduce mod p first)
+  test('modularSqrt with a > p reduces correctly', () => {
+    // 27 ≡ 4 (mod 23), and √4 exists
+    const r = modularSqrt(27n, 23n)
+    expect(r).not.toBe(null)
+    expect(modPow(r, 2n, 23n)).toBe(4n)
   })
 })

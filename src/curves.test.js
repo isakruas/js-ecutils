@@ -45,10 +45,14 @@ describe('Curve registry', () => {
 
   test('all 8 standard curves are accessible and their generators are on-curve', () => {
     const names = [
-      'secp192k1', 'secp192r1',
-      'secp224k1', 'secp224r1',
-      'secp256k1', 'secp256r1',
-      'secp384r1', 'secp521r1',
+      'secp192k1',
+      'secp192r1',
+      'secp224k1',
+      'secp224r1',
+      'secp256k1',
+      'secp256r1',
+      'secp384r1',
+      'secp521r1',
     ]
     for (const name of names) {
       const curve = getCurve(name)
@@ -78,24 +82,26 @@ describe('Curve validation', () => {
 
   // y² = x³ (a=0, b=0) → 4·0³ + 27·0² = 0
   test('singular curve a=0, b=0 raises error', () => {
-    expect(
-      () => new CurveParams({ p: 23n, a: 0n, b: 0n, n: 1n })
-    ).toThrow('Singular curve')
+    expect(() => new CurveParams({ p: 23n, a: 0n, b: 0n, n: 1n })).toThrow(
+      'Singular curve',
+    )
   })
 
   // 4·(-3)³ + 27·(2)² = -108 + 108 = 0
   test('singular curve a=-3, b=2, p=7 raises error', () => {
-    expect(
-      () => new CurveParams({ p: 7n, a: -3n, b: 2n, n: 1n })
-    ).toThrow()
+    expect(() => new CurveParams({ p: 7n, a: -3n, b: 2n, n: 1n })).toThrow()
   })
 
   test('all registry curves have non-zero discriminant', () => {
     const names = [
-      'secp192k1', 'secp192r1',
-      'secp224k1', 'secp224r1',
-      'secp256k1', 'secp256r1',
-      'secp384r1', 'secp521r1',
+      'secp192k1',
+      'secp192r1',
+      'secp224k1',
+      'secp224r1',
+      'secp256k1',
+      'secp256r1',
+      'secp384r1',
+      'secp521r1',
     ]
     for (const name of names) {
       // If discriminant were zero, getCurve would throw
@@ -105,7 +111,10 @@ describe('Curve validation', () => {
 
   test('explicit AFFINE coordinate system is accepted', () => {
     const curve = new CurveParams({
-      p: 23n, a: 1n, b: 1n, n: 28n,
+      p: 23n,
+      a: 1n,
+      b: 1n,
+      n: 28n,
       coord: CoordinateSystem.AFFINE,
     })
     expect(curve.coord).toBe(CoordinateSystem.AFFINE)
@@ -134,8 +143,11 @@ describe('Coordinate system settings', () => {
   test('affine and Jacobian produce identical results for 42·G on secp192k1', () => {
     const curveJac = getCurve('secp192k1')
     const curveAff = new CurveParams({
-      p: curveJac.p, a: curveJac.a, b: curveJac.b,
-      n: curveJac.n, h: curveJac.h,
+      p: curveJac.p,
+      a: curveJac.a,
+      b: curveJac.b,
+      n: curveJac.n,
+      h: curveJac.h,
       coord: CoordinateSystem.AFFINE,
     })
 

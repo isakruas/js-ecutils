@@ -9,5 +9,6 @@
       }
     ]
   ],
-  "plugins": []
+  "plugins": [],
+  "sourceMaps": "inline"
 }

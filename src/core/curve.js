@@ -55,12 +55,11 @@ export class CurveParams {
     this.coord = coord
 
     // Validate non-singular: 4a³ + 27b² ≠ 0 (mod p)
-    const discriminant =
-      (4n * modPow(a, 3n, p) + 27n * modPow(b, 2n, p)) % p
+    const discriminant = (4n * modPow(a, 3n, p) + 27n * modPow(b, 2n, p)) % p
     if (discriminant === 0n) {
       throw new Error(
         `Singular curve: 4a³ + 27b² ≡ 0 (mod p) for a=${a}, b=${b}, p=${p}. ` +
-          'The discriminant must be non-zero for a valid elliptic curve.'
+          'The discriminant must be non-zero for a valid elliptic curve.',
       )
     }
 

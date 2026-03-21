@@ -42,6 +42,9 @@
     "tree": "tree --prune -I 'node_modules'",
     "make": "npm run format && npm run lint && npm run clean && npm run build:npm && npm run build:web"
   },
+  "jest": {
+    "coverageProvider": "v8"
+  },
   "devDependencies": {
     "@babel/cli": "^7.24.1",
     "@babel/core": "^7.24.5",

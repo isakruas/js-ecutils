@@ -29,12 +29,7 @@
  */
 
 import { affineAdd, affineMul } from './arithmetic/affine.js'
-import {
-  jacAdd,
-  jacMul,
-  toAffine,
-  toJacobian,
-} from './arithmetic/jacobian.js'
+import { jacAdd, jacMul, toAffine, toJacobian } from './arithmetic/jacobian.js'
 import { CoordinateSystem } from './curve.js'
 import { modularSqrt, modulus, modPow } from '../utils/math.js'
 
@@ -65,12 +60,12 @@ export class Point {
         const lhs = modPow(y, 2n, curve.p)
         const rhs = modulus(
           modPow(x, 3n, curve.p) + curve.a * x + curve.b,
-          curve.p
+          curve.p,
         )
         if (lhs !== rhs) {
           throw new Error(
             `Point(${x}, ${y}) is not on the curve ` +
-              `y² = x³ + ${curve.a}x + ${curve.b} (mod ${curve.p}).`
+              `y² = x³ + ${curve.a}x + ${curve.b} (mod ${curve.p}).`,
           )
         }
       }
@@ -97,10 +92,8 @@ export class Point {
     if (this.isIdentity || this.curve === null) return false
     const lhs = modPow(this.y, 2n, this.curve.p)
     const rhs = modulus(
-      modPow(this.x, 3n, this.curve.p) +
-        this.curve.a * this.x +
-        this.curve.b,
-      this.curve.p
+      modPow(this.x, 3n, this.curve.p) + this.curve.a * this.x + this.curve.b,
+      this.curve.p,
     )
     return lhs === rhs
   }
@@ -108,8 +101,8 @@ export class Point {
   _requireCurve() {
     if (this.curve === null) {
       throw new Error(
-        "Cannot perform arithmetic on a Point without curve parameters. " +
-          "Pass a CurveParams instance via the 'curve' argument."
+        'Cannot perform arithmetic on a Point without curve parameters. ' +
+          "Pass a CurveParams instance via the 'curve' argument.",
       )
     }
     return this.curve
@@ -142,9 +135,7 @@ export class Point {
    */
   compress() {
     if (this.isIdentity) {
-      throw new Error(
-        'Cannot compress the identity point (point at infinity).'
-      )
+      throw new Error('Cannot compress the identity point (point at infinity).')
     }
     return [this.x, this.y % 2n]
   }
@@ -166,15 +157,12 @@ export class Point {
    * @throws {Error} If x does not correspond to a valid point.
    */
   static decompress(x, parity, curve) {
-    const rhs = modulus(
-      modPow(x, 3n, curve.p) + curve.a * x + curve.b,
-      curve.p
-    )
+    const rhs = modulus(modPow(x, 3n, curve.p) + curve.a * x + curve.b, curve.p)
     let y = modularSqrt(rhs, curve.p)
     if (y === null) {
       throw new Error(
         `x=${x} does not correspond to a valid point on the curve ` +
-          `y² = x³ + ${curve.a}x + ${curve.b} (mod ${curve.p}).`
+          `y² = x³ + ${curve.a}x + ${curve.b} (mod ${curve.p}).`,
       )
     }
     if (y % 2n !== parity) {
@@ -197,9 +185,7 @@ export class Point {
    */
   compressSec1() {
     if (this.isIdentity) {
-      throw new Error(
-        'Cannot compress the identity point (point at infinity).'
-      )
+      throw new Error('Cannot compress the identity point (point at infinity).')
     }
     const curve = this._requireCurve()
     const byteLen = Number((BigInt(curve.p.toString(2).length) + 7n) / 8n)
@@ -223,7 +209,7 @@ export class Point {
   toUncompressedSec1() {
     if (this.isIdentity) {
       throw new Error(
-        'Cannot serialize the identity point (point at infinity).'
+        'Cannot serialize the identity point (point at infinity).',
       )
     }
     const curve = this._requireCurve()
@@ -258,7 +244,7 @@ export class Point {
     if (prefix === 0x02 || prefix === 0x03) {
       if (data.length !== 1 + byteLen) {
         throw new Error(
-          `Compressed SEC 1 data must be ${1 + byteLen} bytes, got ${data.length}.`
+          `Compressed SEC 1 data must be ${1 + byteLen} bytes, got ${data.length}.`,
         )
       }
       const x = bytesToBigInt(data.slice(1))
@@ -269,7 +255,7 @@ export class Point {
     if (prefix === 0x04) {
       if (data.length !== 1 + 2 * byteLen) {
         throw new Error(
-          `Uncompressed SEC 1 data must be ${1 + 2 * byteLen} bytes, got ${data.length}.`
+          `Uncompressed SEC 1 data must be ${1 + 2 * byteLen} bytes, got ${data.length}.`,
         )
       }
       const x = bytesToBigInt(data.slice(1, 1 + byteLen))
@@ -278,7 +264,7 @@ export class Point {
     }
 
     throw new Error(
-      `Unknown SEC 1 prefix: 0x${prefix.toString(16).padStart(2, '0')}. Expected 0x02, 0x03, or 0x04.`
+      `Unknown SEC 1 prefix: 0x${prefix.toString(16).padStart(2, '0')}. Expected 0x02, 0x03, or 0x04.`,
     )
   }
 
@@ -335,7 +321,16 @@ export class Point {
    * @returns {Point}
    */
   sub(other) {
-    return this.add(other.neg ? other.neg() : new Point(other.x, modulus(-other.y, this._requireCurve().p), other.curve || this.curve, true))
+    return this.add(
+      other.neg
+        ? other.neg()
+        : new Point(
+            other.x,
+            modulus(-other.y, this._requireCurve().p),
+            other.curve || this.curve,
+            true,
+          ),
+    )
   }
 
   /**

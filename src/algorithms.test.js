@@ -40,10 +40,12 @@ describe('ECDSA digital signatures', () => {
     const [r, s] = ds.sign(messageHash)
     const n = ds._curve.n
 
-    expect(() => ds.verify(ds.publicKey, messageHash, n, s))
-      .toThrow('r or s are not in the valid range [1, n-1].')
-    expect(() => ds.verify(ds.publicKey, messageHash, r, 0n))
-      .toThrow('r or s are not in the valid range [1, n-1].')
+    expect(() => ds.verify(ds.publicKey, messageHash, n, s)).toThrow(
+      'r or s are not in the valid range [1, n-1].',
+    )
+    expect(() => ds.verify(ds.publicKey, messageHash, r, 0n)).toThrow(
+      'r or s are not in the valid range [1, n-1].',
+    )
   })
 
   // signMessage hashes the message with SHA-256, then signs the integer hash
@@ -56,6 +58,47 @@ describe('ECDSA digital signatures', () => {
   // Q = d·G must lie on the curve
   test('public key Q = d·G is on the curve', () => {
     expect(ds.publicKey.isOnCurve()).toBe(true)
+  })
+
+  // signMessage/verifyMessage with a custom hash function
+  test('signMessage and verifyMessage with custom hash function', async () => {
+    const customHash = async (msg) => {
+      // Simple deterministic "hash" for testing: hex of char codes
+      let hex = ''
+      const str = typeof msg === 'string' ? msg : String.fromCharCode(...msg)
+      for (let i = 0; i < str.length; i++) {
+        hex += str.charCodeAt(i).toString(16).padStart(2, '0')
+      }
+      return hex.padStart(64, '0')
+    }
+    const message = 'custom hash test'
+    const [r, s] = await ds.signMessage(message, customHash)
+    expect(
+      await ds.verifyMessage(ds.publicKey, message, r, s, customHash),
+    ).toBe(true)
+  })
+
+  // signMessage with Uint8Array input
+  test('signMessage and verifyMessage with Uint8Array input', async () => {
+    const message = new Uint8Array([72, 101, 108, 108, 111]) // "Hello"
+    const [r, s] = await ds.signMessage(message)
+    expect(await ds.verifyMessage(ds.publicKey, message, r, s)).toBe(true)
+  })
+
+  // verify rejects a tampered signature
+  test('verify rejects tampered signature', () => {
+    const messageHash = 123456789n
+    const [r, s] = ds.sign(messageHash)
+    // Tamper with the hash
+    expect(ds.verify(ds.publicKey, messageHash + 1n, r, s)).toBe(false)
+  })
+
+  // DigitalSignature with a different curve
+  test('works with secp384r1', () => {
+    const ds384 = new DigitalSignature(42n, 'secp384r1')
+    const hash = 0xabcdefn
+    const [r, s] = ds384.sign(hash)
+    expect(ds384.verify(ds384.publicKey, hash, r, s)).toBe(true)
   })
 })
 

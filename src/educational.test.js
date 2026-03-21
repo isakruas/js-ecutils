@@ -33,7 +33,11 @@ import { isQuadraticResidue, modularSqrt } from './utils/math'
 
 describe('Educational: E/F₂₃  y² = x³ + x + 1', () => {
   const curve = new CurveParams({
-    p: 23n, a: 1n, b: 1n, n: 28n, h: 1n,
+    p: 23n,
+    a: 1n,
+    b: 1n,
+    n: 28n,
+    h: 1n,
     coord: CoordinateSystem.AFFINE,
   })
   const P = new Point(0n, 1n, curve)
@@ -85,7 +89,11 @@ describe('Educational: E/F₂₃  y² = x³ + x + 1', () => {
 
 describe('Educational: E/F₇  y² = x³ + 2', () => {
   const curve = new CurveParams({
-    p: 7n, a: 0n, b: 2n, n: 9n, h: 1n,
+    p: 7n,
+    a: 0n,
+    b: 2n,
+    n: 9n,
+    h: 1n,
     coord: CoordinateSystem.AFFINE,
   })
 
@@ -129,7 +137,11 @@ describe('Educational: quadratic residues and point compression', () => {
   // compress → (x, parity),  decompress → Point(x, y)
   test('compress/decompress roundtrip on Z₂₃ curve', () => {
     const curve = new CurveParams({
-      p: 23n, a: 1n, b: 1n, n: 28n, h: 1n,
+      p: 23n,
+      a: 1n,
+      b: 1n,
+      n: 28n,
+      h: 1n,
     })
     const P = new Point(0n, 1n, curve)
     const [x, parity] = P.compress()
@@ -152,11 +164,19 @@ describe('Educational: quadratic residues and point compression', () => {
 describe('Educational: Jacobian vs Affine arithmetic', () => {
   test('addition gives the same result in both coordinate systems', () => {
     const affineCurve = new CurveParams({
-      p: 23n, a: 1n, b: 1n, n: 28n, h: 1n,
+      p: 23n,
+      a: 1n,
+      b: 1n,
+      n: 28n,
+      h: 1n,
       coord: CoordinateSystem.AFFINE,
     })
     const jacobianCurve = new CurveParams({
-      p: 23n, a: 1n, b: 1n, n: 28n, h: 1n,
+      p: 23n,
+      a: 1n,
+      b: 1n,
+      n: 28n,
+      h: 1n,
       coord: CoordinateSystem.JACOBIAN,
     })
     const Pa = new Point(0n, 1n, affineCurve)
@@ -173,11 +193,19 @@ describe('Educational: Jacobian vs Affine arithmetic', () => {
 
   test('scalar multiplication gives the same result for k ∈ {2, 5, 13, 27}', () => {
     const affineCurve = new CurveParams({
-      p: 23n, a: 1n, b: 1n, n: 28n, h: 1n,
+      p: 23n,
+      a: 1n,
+      b: 1n,
+      n: 28n,
+      h: 1n,
       coord: CoordinateSystem.AFFINE,
     })
     const jacobianCurve = new CurveParams({
-      p: 23n, a: 1n, b: 1n, n: 28n, h: 1n,
+      p: 23n,
+      a: 1n,
+      b: 1n,
+      n: 28n,
+      h: 1n,
       coord: CoordinateSystem.JACOBIAN,
     })
     const Pa = new Point(0n, 1n, affineCurve)

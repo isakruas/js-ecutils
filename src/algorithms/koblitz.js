@@ -79,10 +79,7 @@ export class Koblitz {
     const d = 100n
     for (let j = 1; j < 100; j++) {
       const x = modulus(d * m + BigInt(j), curve.p)
-      const s = modulus(
-        modPow(x, 3n, curve.p) + curve.a * x + curve.b,
-        curve.p
-      )
+      const s = modulus(modPow(x, 3n, curve.p) + curve.a * x + curve.b, curve.p)
 
       // Euler criterion + shortcut for p ≡ 3 (mod 4):
       //   s is a QR iff s ≡ s^((p+1)/2) (mod p)
@@ -96,6 +93,7 @@ export class Koblitz {
       }
     }
 
+    /* istanbul ignore next -- failure probability ≈ 2⁻⁹⁹ */
     throw new Error('Failed to encode message to a valid point on the curve.')
   }
 

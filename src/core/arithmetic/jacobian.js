@@ -143,10 +143,7 @@ export function jacAdd(jp1, jp2, curve) {
   const v = modulus(u1 * i, p)
   const x = modulus(r * r - j - 2n * v, p)
   const y = modulus(r * (v - x) - 2n * s1 * j, p)
-  const z = modulus(
-    ((jp1.z + jp2.z) * (jp1.z + jp2.z) - z1z1 - z2z2) * h,
-    p
-  )
+  const z = modulus(((jp1.z + jp2.z) * (jp1.z + jp2.z) - z1z1 - z2z2) * h, p)
   return new JacobianPoint(x, y, z)
 }
 

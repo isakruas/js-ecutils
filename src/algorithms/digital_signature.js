@@ -30,11 +30,11 @@ import { modulus, modInverse } from '../utils/math.js'
  * Uses globalThis.crypto (Web Crypto API) when available, with
  * a dynamic require fallback for Node.js environments.
  */
+/* istanbul ignore next -- environment-specific crypto detection */
 function getCrypto() {
   if (typeof globalThis.crypto !== 'undefined') return globalThis.crypto
-  // Dynamic require to avoid webpack static analysis
   const mod = 'crypto'
-  return typeof require !== 'undefined' ? require(mod) : null
+  return typeof require !== 'undefined' ? require(mod) : null // eslint-disable-line no-undef
 }
 
 /**
@@ -52,10 +52,14 @@ function secureRandBelow(max) {
     const cryptoMod = getCrypto()
     if (cryptoMod && cryptoMod.getRandomValues) {
       cryptoMod.getRandomValues(bytes)
-    } else if (cryptoMod && cryptoMod.randomBytes) {
+    } /* istanbul ignore next -- Node.js without Web Crypto */ else if (
+      cryptoMod &&
+      cryptoMod.randomBytes
+    ) {
       const buf = cryptoMod.randomBytes(byteLen)
       bytes.set(buf)
     } else {
+      /* istanbul ignore next */
       throw new Error('No secure random number generator available.')
     }
     let hex = ''
@@ -120,10 +124,7 @@ export class DigitalSignature {
       const k = secureRandBelow(n)
       const R = G.mul(k)
       r = modulus(R.x, n)
-      s = modulus(
-        (messageHash + r * this.privateKey) * modInverse(k, n),
-        n
-      )
+      s = modulus((messageHash + r * this.privateKey) * modInverse(k, n), n)
     }
     return [r, s]
   }
@@ -218,10 +219,12 @@ async function defaultHash(message, hashFunc) {
   }
 
   // Node.js fallback
+  /* istanbul ignore next -- Node.js without Web Crypto */
   if (cryptoMod && cryptoMod.createHash) {
     const hash = cryptoMod.createHash('sha256').update(bytes).digest('hex')
     return BigInt('0x' + hash)
   }
 
+  /* istanbul ignore next */
   throw new Error('No hash function available.')
 }
