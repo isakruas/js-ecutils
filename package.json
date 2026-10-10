@@ -1,8 +1,8 @@
 {
   "name": "js-ecutils",
-  "version": "0.0.2-alpha",
+  "version": "0.0.3-alpha",
   "description": "JavaScript Library for Elliptic Curve Cryptography: key exchanges (Diffie-Hellman, Massey-Omura), ECDSA signatures, and Koblitz encoding. Suitable for crypto education and secure systems.",
-  "repository":"https://github.com/isakruas/js-ecutils",
+  "repository": "https://github.com/isakruas/js-ecutils",
   "keywords": [
     "ecdsa",
     "secure-communication",
