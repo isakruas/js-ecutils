@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 - `validatePublicKey(point, curve)` and `sameDomain(a, b)` helpers (`src/core/validation.js`), performing domain binding, non-identity, range, on-curve and (for `h > 1`) subgroup checks.
 
+### Changed
+- **Breaking:** `DiffieHellman.computeSharedSecret()`, `MasseyOmura.encrypt()`/`decrypt()` and `DigitalSignature.verify()` now throw for points from another curve or without `CurveParams`; `new Point()` throws for coordinates `< 0` or `≥ p`.
+- **CI/CD** — the npm deploy workflow publishes via npm trusted publishing (OIDC, with provenance) instead of the `NPM_TOKEN` secret, uses the built-in `GITHUB_TOKEN` instead of the `HUB_TOKEN` personal access token, runs on Node 24, and uses `actions/checkout`/`actions/setup-node` v4.
+
 ## [0.0.2-alpha] - 2026-03-21
 
 ### Added
