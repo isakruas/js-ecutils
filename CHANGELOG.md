@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- **ECDH peer-domain validation** — `DiffieHellman.computeSharedSecret()` now validates the peer public key against the locally configured curve before multiplying. Previously a `Point` carrying foreign `CurveParams` with a small order `r` caused the private key to be reduced modulo `r`, leaking `d mod r` (residues combinable via the CRT). Identity shared secrets are rejected.
+- **Massey-Omura / ECDSA** — `MasseyOmura.encrypt()`/`decrypt()` and `DigitalSignature.verify()` apply the same public-key validation.
+- **Canonical coordinates** — the `Point` constructor (and therefore `fromSec1()`/`decompress()`) rejects coordinates outside `[0, p-1]`, e.g. a compressed SEC 1 encoding with `x = p + 1`. SEC 1 serialization rejects values that overflow the field size.
+
+### Added
+- `validatePublicKey(point, curve)` and `sameDomain(a, b)` helpers (`src/core/validation.js`), performing domain binding, non-identity, range, on-curve and (for `h > 1`) subgroup checks.
+
 ## [0.0.2-alpha] - 2026-03-21
 
 ### Added
