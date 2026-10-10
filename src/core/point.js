@@ -37,8 +37,10 @@ export class Point {
   /**
    * Create a point on an elliptic curve.
    *
-   * Validates that the point lies on the curve at construction time:
+   * Validates that the coordinates are canonical field elements and
+   * that the point lies on the curve at construction time:
    *
+   *     0 ≤ x, y < p
    *     y² ≡ x³ + ax + b  (mod p)
    *
    * Points produced by internal arithmetic use _trusted = true to skip
@@ -54,9 +56,15 @@ export class Point {
     this.y = y
     this.curve = curve
 
-    // Validate: y² ≡ x³ + ax + b (mod p)
+    // Validate: 0 ≤ x, y < p  and  y² ≡ x³ + ax + b (mod p)
     if (!_trusted) {
       if (x !== null && y !== null && curve !== null) {
+        if (x < 0n || x >= curve.p || y < 0n || y >= curve.p) {
+          throw new Error(
+            `Point(${x}, ${y}) coordinates must be in the range [0, p-1] ` +
+              `for p=${curve.p}.`,
+          )
+        }
         const lhs = modPow(y, 2n, curve.p)
         const rhs = modulus(
           modPow(x, 3n, curve.p) + curve.a * x + curve.b,
@@ -364,6 +372,9 @@ export class Point {
 // ----- helper functions for byte ↔ BigInt conversion -----
 
 function bigIntToBytes(value, length) {
+  if (value < 0n || value >= 1n << BigInt(8 * length)) {
+    throw new Error(`Value does not fit in ${length} bytes.`)
+  }
   const hex = value.toString(16).padStart(length * 2, '0')
   const bytes = new Uint8Array(length)
   for (let i = 0; i < length; i++) {

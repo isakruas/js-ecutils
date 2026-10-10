@@ -31,6 +31,7 @@
  */
 
 import { getCurve } from '../curves/registry.js'
+import { validatePublicKey } from '../core/validation.js'
 import { modInverse } from '../utils/math.js'
 
 /**
@@ -63,10 +64,15 @@ export class MasseyOmura {
    *
    *     C = e · P
    *
+   * The incoming point is validated against the configured curve so a
+   * peer cannot make the private key be reduced modulo a foreign order.
+   *
    * @param {Point} point - A curve point (message or partially encrypted).
    * @returns {Point} e · point
+   * @throws {Error} If point does not belong to the configured curve.
    */
   encrypt(point) {
+    validatePublicKey(point, this._curve)
     return point.mul(this.privateKey)
   }
 
@@ -77,8 +83,10 @@ export class MasseyOmura {
    *
    * @param {Point} point - A curve point to decrypt.
    * @returns {Point} e⁻¹ · point
+   * @throws {Error} If point does not belong to the configured curve.
    */
   decrypt(point) {
+    validatePublicKey(point, this._curve)
     return point.mul(this._inverseKey)
   }
 }

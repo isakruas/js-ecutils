@@ -1,6 +1,7 @@
 // Core
 export { Point } from './core/point.js'
 export { CurveParams, CoordinateSystem } from './core/curve.js'
+export { sameDomain, validatePublicKey } from './core/validation.js'
 
 // Curves
 export { getCurve, getGenerator } from './curves/registry.js'

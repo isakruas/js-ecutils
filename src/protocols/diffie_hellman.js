@@ -20,7 +20,8 @@
  *     // sharedAlice.x === sharedBob.x
  */
 
-import { getGenerator } from '../curves/registry.js'
+import { getCurve, getGenerator } from '../curves/registry.js'
+import { validatePublicKey } from '../core/validation.js'
 
 /**
  * Elliptic Curve Diffie-Hellman key exchange.
@@ -52,10 +53,21 @@ export class DiffieHellman {
    *
    *     S = d · Q_other = d · d_other · G
    *
+   * The peer key is validated against the locally configured curve before
+   * any multiplication (SEC 1 §3.2.2.1).  Without this check a peer could
+   * supply a Point on a foreign curve with small order r, and the result
+   * (d mod r)·Q would leak the residue of the private key modulo r.
+   *
    * @param {Point} otherPublicKey - The other party's public key point Q.
    * @returns {Point} The shared secret point.
+   * @throws {Error} If the public key is invalid or the secret is O.
    */
   computeSharedSecret(otherPublicKey) {
-    return otherPublicKey.mul(this.privateKey)
+    validatePublicKey(otherPublicKey, getCurve(this.curveName))
+    const secret = otherPublicKey.mul(this.privateKey)
+    if (secret.isIdentity) {
+      throw new Error('Shared secret is the point at infinity.')
+    }
+    return secret
   }
 }

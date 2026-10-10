@@ -23,6 +23,7 @@
  */
 
 import { getCurve, getGenerator } from '../curves/registry.js'
+import { validatePublicKey } from '../core/validation.js'
 import { modulus, modInverse } from '../utils/math.js'
 
 /**
@@ -143,13 +144,15 @@ export class DigitalSignature {
    * @param {BigInt} r          - First component of the signature.
    * @param {BigInt} s          - Second component of the signature.
    * @returns {boolean}
-   * @throws {Error} If r or s are outside [1, n-1].
+   * @throws {Error} If r or s are outside [1, n-1], or the public key is
+   *   not a valid point on the configured curve.
    */
   verify(publicKey, messageHash, r, s) {
     const n = this._curve.n
     if (!(1n <= r && r < n && 1n <= s && s < n)) {
       throw new Error('r or s are not in the valid range [1, n-1].')
     }
+    validatePublicKey(publicKey, this._curve)
     const G = this._G
     const w = modInverse(s, n)
     const u1 = modulus(messageHash * w, n)
