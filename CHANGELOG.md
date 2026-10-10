@@ -16,7 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 - **Breaking:** `DiffieHellman.computeSharedSecret()`, `MasseyOmura.encrypt()`/`decrypt()` and `DigitalSignature.verify()` now throw for points from another curve or without `CurveParams`; `new Point()` throws for coordinates `< 0` or `≥ p`.
-- **CI/CD** — the npm deploy workflow publishes via npm trusted publishing (OIDC, with provenance) instead of the `NPM_TOKEN` secret, uses the built-in `GITHUB_TOKEN` instead of the `HUB_TOKEN` personal access token, runs on Node 24, and uses `actions/checkout`/`actions/setup-node` v4.
+- **CI/CD** — the npm deploy workflow publishes via npm trusted publishing (OIDC, with provenance) instead of the `NPM_TOKEN` secret, uses the built-in `GITHUB_TOKEN` instead of the `HUB_TOKEN` personal access token, runs on Node 24, and uses `actions/checkout`/`actions/setup-node` v4. Prerelease versions are published with an explicit `--tag latest` (required by npm 11), and the GitHub Release is created with the `gh` CLI instead of the archived `actions/create-release`.
+- **`package.json`** — `repository` normalized to the object form expected by npm.
 
 ## [0.0.2-alpha] - 2026-03-21
 
